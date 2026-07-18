@@ -9,6 +9,7 @@ import { AiModule } from './ai/ai.module';
 import { AiProvidersModule } from './ai-providers/ai-providers.module';
 import { ExamsModule } from './exams/exams.module';
 import { ResultsModule } from './results/results.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { CommonModule } from './common/common.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { CommonModule } from './common/common.module';
     AiProvidersModule,
     ExamsModule,
     ResultsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })

@@ -85,12 +85,13 @@ Return a JSON object with:
 - "isCorrect": boolean (true if fully correct)
 - "score": number between 0 and 100
 - "feedback": string (brief feedback to the student)
-- "correctionHint": string (if wrong, hint toward the right answer)`;
+- "correctionHint": string (if wrong, hint toward the right answer)
+- "explanation": string (detailed pedagogical explanation including the grammar rule being tested, why the correct answer is right, and 1-2 example sentences for reinforcement)`;
 
     const response = await this.chatCompletion([
-      { role: 'system', content: 'You are an English teacher evaluating student answers. Always respond with valid JSON.' },
+      { role: 'system', content: 'You are an English teacher evaluating student answers. Always respond with valid JSON. Provide clear pedagogical explanations that help students learn.' },
       { role: 'user', content: prompt },
-    ], 0.3, 1000);
+    ], 0.3, 1500);
 
     return response;
   }

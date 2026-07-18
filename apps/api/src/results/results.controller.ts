@@ -1,7 +1,36 @@
-import { Controller } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ResultsService } from './results.service';
+import { AuthGuard } from '../common/guards/auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('results')
+@UseGuards(AuthGuard)
 export class ResultsController {
   constructor(private readonly resultsService: ResultsService) {}
+
+  @Get()
+  findAll(
+    @CurrentUser('id') userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.resultsService.findAll(userId, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get(':examId')
+  findOne(
+    @Param('examId') examId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.resultsService.findById(examId, userId);
+  }
 }

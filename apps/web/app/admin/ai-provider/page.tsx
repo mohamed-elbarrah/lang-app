@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Eye, EyeOff, Loader2, RefreshCw, Trash2, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Loader2, RefreshCw, Trash2, AlertCircle, Search, CheckSquare, Square } from 'lucide-react'
 import {
   useGetAIProvidersQuery,
   useCreateAIProviderMutation,
@@ -21,8 +21,13 @@ import {
   type ProviderModel,
 } from '@/lib/features/ai-providers-api-slice'
 
+const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
+
 export default function AdminAIProviderPage() {
-  const { data: providers, isLoading, error: queryError, refetch } = useGetAIProvidersQuery()
+  const { data: rawProviders, isLoading, error: queryError, refetch } = useGetAIProvidersQuery()
+  const providers = rawProviders && typeof rawProviders === 'object' && 'data' in rawProviders
+    ? (rawProviders as any).data
+    : rawProviders
   const [createProvider, { isLoading: isCreating }] = useCreateAIProviderMutation()
   const [updateProvider, { isLoading: isUpdating }] = useUpdateAIProviderMutation()
   const [deleteProvider, { isLoading: isDeleting }] = useDeleteAIProviderMutation()
@@ -33,24 +38,53 @@ export default function AdminAIProviderPage() {
 
   const [apiKey, setApiKey] = useState('')
   const [defaultModel, setDefaultModel] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL)
   const [showKey, setShowKey] = useState(false)
   const [connectionResult, setConnectionResult] = useState<'idle' | 'success' | 'fail' | 'testing'>('idle')
   const [models, setModels] = useState<ProviderModel[]>([])
   const [dirty, setDirty] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [modelSearch, setModelSearch] = useState('')
+  const [autoFetching, setAutoFetching] = useState(false)
+  const autoFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoFetchedForKey = useRef('')
 
   useEffect(() => {
     if (provider) {
       setApiKey(provider.apiKey || '')
       setDefaultModel(provider.defaultModel || '')
-      setBaseUrl(provider.baseUrl || '')
+      setBaseUrl(provider.baseUrl || DEFAULT_BASE_URL)
       setModels(provider.models || [])
       setDirty(false)
       setConnectionResult('idle')
     }
   }, [provider])
+
+  useEffect(() => {
+    if (autoFetchTimer.current) clearTimeout(autoFetchTimer.current)
+    if (!provider || !apiKey || autoFetchedForKey.current === apiKey) return
+    autoFetchedForKey.current = apiKey
+    autoFetchTimer.current = setTimeout(async () => {
+      setAutoFetching(true)
+      try {
+        const res = await fetch(`/api/ai-providers/${provider!.id}/models`, {
+          credentials: 'include',
+        })
+        if (res.ok) {
+          const body = await safeParseJson(res)
+          setModels(body.data || [])
+        }
+      } catch {
+        /* silent — models will just not load */
+      } finally {
+        setAutoFetching(false)
+      }
+    }, 1200)
+    return () => {
+      if (autoFetchTimer.current) clearTimeout(autoFetchTimer.current)
+    }
+  }, [apiKey, provider])
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg)
@@ -62,30 +96,42 @@ export default function AdminAIProviderPage() {
     setPageError(null)
     setConnectionResult('testing')
     try {
-      const result = await testConnection(provider.id).unwrap()
-      setConnectionResult(result ? 'success' : 'fail')
+      const raw: any = await testConnection(provider.id).unwrap()
+      const connected = raw?.data != null ? raw.data : raw
+      setConnectionResult(connected ? 'success' : 'fail')
     } catch (err) {
       setConnectionResult('fail')
       setPageError(err instanceof Error ? err.message : 'Connection test failed')
     }
   }
 
-  const handleFetchModels = async () => {
+  const safeParseJson = async (res: Response): Promise<any> => {
+    const text = await res.text()
+    try {
+      return JSON.parse(text)
+    } catch {
+      throw new Error(`Server returned non-JSON response (${res.status})`)
+    }
+  }
+
+  const handleFetchModels = async (isAuto = false) => {
     if (!provider) return
     setPageError(null)
+    if (isAuto) setAutoFetching(true)
     try {
       const res = await fetch(`/api/ai-providers/${provider.id}/models`, {
         credentials: 'include',
       })
+      const body = await safeParseJson(res)
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err?.error?.message || 'Failed to fetch models')
+        throw new Error(body?.error?.message || `Request failed (${res.status})`)
       }
-      const json = await res.json()
-      setModels(json.data || [])
-      showSuccess('Models fetched successfully')
+      setModels(body.data || [])
+      if (!isAuto) showSuccess('Models fetched successfully')
     } catch (err) {
-      setPageError(err instanceof Error ? err.message : 'Failed to fetch models')
+      if (!isAuto) setPageError(err instanceof Error ? err.message : 'Failed to fetch models')
+    } finally {
+      setAutoFetching(false)
     }
   }
 
@@ -104,6 +150,22 @@ export default function AdminAIProviderPage() {
     } catch (err) {
       setModels(models)
       setPageError(err instanceof Error ? err.message : 'Failed to update model')
+    }
+  }
+
+  const handleToggleAll = async (enabled: boolean) => {
+    if (!provider) return
+    setPageError(null)
+    const updated = models.map((m) => ({ ...m, isEnabled: enabled }))
+    setModels(updated)
+    try {
+      await updateModels({
+        id: provider.id,
+        models: updated.map((m) => ({ id: m.id, isEnabled: m.isEnabled })),
+      }).unwrap()
+    } catch (err) {
+      setModels(models)
+      setPageError(err instanceof Error ? err.message : 'Failed to update models')
     }
   }
 
@@ -156,6 +218,21 @@ export default function AdminAIProviderPage() {
       setPageError(err instanceof Error ? err.message : 'Failed to delete provider')
     }
   }
+
+  const filteredModels = useMemo(
+    () =>
+      modelSearch
+        ? models.filter(
+            (m) =>
+              m.modelName.toLowerCase().includes(modelSearch.toLowerCase()) ||
+              m.modelId.toLowerCase().includes(modelSearch.toLowerCase()),
+          )
+        : models,
+    [models, modelSearch],
+  )
+
+  const allEnabled = models.length > 0 && models.every((m) => m.isEnabled)
+  const allDisabled = models.length > 0 && models.every((m) => !m.isEnabled)
 
   if (isLoading) {
     return (
@@ -219,10 +296,9 @@ export default function AdminAIProviderPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="create-base-url">Base URL (optional)</Label>
+              <Label htmlFor="create-base-url">Base URL</Label>
               <Input
                 id="create-base-url"
-                placeholder="https://openrouter.ai/api/v1"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
               />
@@ -342,7 +418,7 @@ export default function AdminAIProviderPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="base-url">Base URL (optional)</Label>
+            <Label htmlFor="base-url">Base URL</Label>
             <Input
               id="base-url"
               value={baseUrl}
@@ -350,7 +426,6 @@ export default function AdminAIProviderPage() {
                 setBaseUrl(e.target.value)
                 setDirty(true)
               }}
-              placeholder="https://openrouter.ai/api/v1"
             />
           </div>
 
@@ -362,37 +437,90 @@ export default function AdminAIProviderPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleFetchModels}
-                disabled={!apiKey}
+                onClick={() => handleFetchModels(false)}
+                disabled={!apiKey || autoFetching}
               >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Fetch Models
+                <RefreshCw className={`h-3 w-3 mr-1 ${autoFetching ? 'animate-spin' : ''}`} />
+                {autoFetching ? 'Fetching...' : 'Fetch Models'}
               </Button>
             </div>
 
-            {models.length > 0 ? (
-              <div className="space-y-1 max-h-64 overflow-y-auto border rounded-md p-1">
-                {models.map((model) => (
-                  <div
-                    key={model.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-muted/50 text-sm"
-                  >
-                    <span className="font-medium truncate">{model.modelName}</span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-muted-foreground">{model.modelId}</span>
-                      <Switch
-                        checked={model.isEnabled}
-                        onCheckedChange={(checked: boolean) =>
-                          handleToggleModel(model.id, checked)
-                        }
-                      />
-                    </div>
-                  </div>
-                ))}
+            {autoFetching && models.length === 0 && (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Fetching models...
               </div>
-            ) : (
+            )}
+
+            {models.length > 0 && (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search models..."
+                    className="pl-8"
+                    value={modelSearch}
+                    onChange={(e) => setModelSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleToggleAll(true)}
+                    disabled={allEnabled}
+                    className="text-xs h-7"
+                  >
+                    <CheckSquare className="h-3.5 w-3.5 mr-1" />
+                    Select All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleToggleAll(false)}
+                    disabled={allDisabled}
+                    className="text-xs h-7"
+                  >
+                    <Square className="h-3.5 w-3.5 mr-1" />
+                    Deselect All
+                  </Button>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {models.filter((m) => m.isEnabled).length} / {models.length} enabled
+                  </span>
+                </div>
+
+                <div className="space-y-1 max-h-64 overflow-y-auto border rounded-md p-1">
+                  {filteredModels.length > 0 ? (
+                    filteredModels.map((model) => (
+                      <div
+                        key={model.id}
+                        className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-muted/50 text-sm"
+                      >
+                        <span className="font-medium truncate">{model.modelName}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-muted-foreground">{model.modelId}</span>
+                          <Switch
+                            checked={model.isEnabled}
+                            onCheckedChange={(checked: boolean) =>
+                              handleToggleModel(model.id, checked)
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No models match &quot;{modelSearch}&quot;
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {models.length === 0 && !autoFetching && (
               <p className="text-sm text-muted-foreground">
-                No models loaded. Click &quot;Fetch Models&quot; to load available models from the provider.
+                No models loaded. Click &quot;Fetch Models&quot; or enter an API key to load available models.
               </p>
             )}
           </div>

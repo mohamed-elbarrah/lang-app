@@ -2,12 +2,19 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlayCircle } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { PlayCircle, Trophy, FileText, TrendingUp } from "lucide-react"
 import Link from "next/link"
 import { useAppSelector } from "@/lib/hooks"
+import { useGetUserStatsQuery } from "@/lib/features/dashboard-api-slice"
 
 export default function DashboardPage() {
   const { user } = useAppSelector((s) => s.auth)
+  const { data: rawStats, isLoading, error } = useGetUserStatsQuery()
+
+  const stats = rawStats && typeof rawStats === 'object' && 'data' in rawStats
+    ? (rawStats as any).data
+    : rawStats
 
   return (
     <div className="space-y-8">
@@ -37,17 +44,75 @@ export default function DashboardPage() {
             <CardTitle>Quick Stats</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Tests Completed</span>
-              <span className="font-bold text-xl">0</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground text-sm">Avg. Score</span>
-              <span className="font-bold text-xl">—</span>
-            </div>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </>
+            ) : error ? (
+              <p className="text-sm text-muted-foreground">Could not load stats</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">Tests Completed</span>
+                  <span className="font-bold text-xl">{stats?.totalExams ?? 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">Avg. Score</span>
+                  <span className="font-bold text-xl">{stats?.averageScore != null ? `${stats.averageScore}%` : '—'}</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {stats?.recentExams && stats.recentExams.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Tests</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats.recentExams.map((exam: any) => (
+                <Link
+                  key={exam.id}
+                  href={`/dashboard/results/${exam.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {exam.score != null && exam.score >= 80 ? (
+                      <Trophy className="h-5 w-5 text-yellow-500" />
+                    ) : exam.score != null && exam.score >= 60 ? (
+                      <TrendingUp className="h-5 w-5 text-blue-500" />
+                    ) : (
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{exam.questionCount} Questions</p>
+                      <p className="text-xs text-muted-foreground">{new Date(exam.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {exam.score != null ? `${exam.score}%` : 'Pending'}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && stats?.totalExams === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <p className="mb-4">No tests completed yet.</p>
+            <Button asChild>
+              <Link href="/dashboard/new-test">Take Your First Test</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

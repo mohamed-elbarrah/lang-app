@@ -3,6 +3,9 @@ import authReducer from './features/auth-slice'
 import { authApi } from './features/auth-api-slice'
 import { aiProvidersApi } from './features/ai-providers-api-slice'
 import { usersApi } from './features/users-api-slice'
+import { examsApi } from './features/exams-api-slice'
+import { resultsApi } from './features/results-api-slice'
+import { dashboardApi } from './features/dashboard-api-slice'
 
 export const makeStore = () =>
   configureStore({
@@ -11,9 +14,12 @@ export const makeStore = () =>
       [authApi.reducerPath]: authApi.reducer,
       [aiProvidersApi.reducerPath]: aiProvidersApi.reducer,
       [usersApi.reducerPath]: usersApi.reducer,
+      [examsApi.reducerPath]: examsApi.reducer,
+      [resultsApi.reducerPath]: resultsApi.reducer,
+      [dashboardApi.reducerPath]: dashboardApi.reducer,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(authApi.middleware, aiProvidersApi.middleware, usersApi.middleware),
+      getDefaultMiddleware().concat(authApi.middleware, aiProvidersApi.middleware, usersApi.middleware, examsApi.middleware, resultsApi.middleware, dashboardApi.middleware),
   })
 
 export type AppStore = ReturnType<typeof makeStore>
