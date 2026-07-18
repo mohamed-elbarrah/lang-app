@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("user")
+  createdAt    DateTime @default(now())
+  exams        Exam[]
+}
+
+model Lesson {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  topic     String
+  createdAt DateTime @default(now())
+}
+
+model Exam {
+  id             String     @id @default(uuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  questionCount  Int
+  correctionMode String     @default("final")
+  status         String     @default("in_progress")
+  score          Int?
+  createdAt      DateTime   @default(now())
+  completedAt    DateTime?
+  questions      Question[]
+}
+
+model Question {
+  id            String   @id @default(uuid())
+  examId        String
+  exam          Exam     @relation(fields: [examId], references: [id])
+  type          String
+  content       Json
+  userAnswer    Json?
+  correctAnswer String?
+  isCorrect     Boolean?
+  explanation   String?
+  order         Int
+  lessonTopic   String?
+}
+
+model AiProvider {
+  id            String          @id @default(uuid())
+  name          String
+  providerType  String          @default("openrouter")
+  apiKey        String
+  baseUrl       String?
+  isActive      Boolean         @default(false)
+  defaultModel  String?
+  models        ProviderModel[]
+}
+
+model ProviderModel {
+  id         String     @id @default(uuid())
+  providerId String
+  provider   AiProvider @relation(fields: [providerId], references: [id])
+  modelId    String
+  modelName  String
+  isEnabled  Boolean    @default(false)
+}

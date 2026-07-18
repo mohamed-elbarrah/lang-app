@@ -21,7 +21,7 @@
 
 ## Phases
 
-### Phase 1: Foundation — Infrastructure & Database ❏
+### Phase 1: Foundation — Infrastructure & Database ☑
 
 - [ ] Docker Compose for PostgreSQL
 - [ ] Prisma schema (users, lessons, exams, questions, ai_providers, provider_models)
