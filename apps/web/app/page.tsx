@@ -1,101 +1,71 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
-
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
-
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
-
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+    <div className="flex flex-col min-h-screen">
+      <header className="flex h-16 items-center border-b px-6 justify-between shrink-0">
+        <div className="flex items-center gap-2 font-bold text-lg">
+          <CheckCircle2 className="h-6 w-6 text-primary" />
+          <span>GrammarAI</span>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
+        <nav className="flex items-center gap-4">
+          <Link href="/login" className="text-sm font-medium hover:underline">
+            Login
+          </Link>
+          <Button asChild size="sm">
+            <Link href="/register">Get Started</Link>
+          </Button>
+        </nav>
+      </header>
+      
+      <main className="flex-1">
+        <section className="w-full py-24 lg:py-32 flex flex-col items-center text-center px-4">
+          <div className="space-y-4 max-w-3xl">
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tighter">
+              Master English Grammar with AI
+            </h1>
+            <p className="text-lg md:text-xl text-muted-foreground">
+              Generate unlimited, personalized grammar exams based on approved lessons. Get instant AI-powered corrections and improve your skills faster.
+            </p>
+            <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+              <Button asChild size="lg" className="px-8">
+                <Link href="/register">Start Learning Now</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link href="/login">I already have an account</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="w-full py-12 md:py-24 bg-muted/50 px-4">
+          <div className="container mx-auto max-w-5xl">
+            <h2 className="text-3xl font-bold text-center mb-12">How it works</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="flex flex-col items-center text-center p-6 bg-background rounded-xl shadow-sm">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl mb-4">1</div>
+                <h3 className="text-xl font-semibold mb-2">Configure Exam</h3>
+                <p className="text-muted-foreground">Choose how many questions you want and your preferred correction mode.</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-6 bg-background rounded-xl shadow-sm">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl mb-4">2</div>
+                <h3 className="text-xl font-semibold mb-2">Answer Questions</h3>
+                <p className="text-muted-foreground">Take the unique, AI-generated exam with various question types.</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-6 bg-background rounded-xl shadow-sm">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl mb-4">3</div>
+                <h3 className="text-xl font-semibold mb-2">Get Feedback</h3>
+                <p className="text-muted-foreground">Review detailed explanations and learn from your mistakes instantly.</p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
+
+      <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+        <p>© {new Date().getFullYear()} GrammarAI. All rights reserved.</p>
       </footer>
     </div>
   );
