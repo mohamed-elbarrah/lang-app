@@ -156,6 +156,8 @@ Nothing else.
 
 # Database
 
+Run PostgreSQL via Docker Compose for local development.
+
 Design only the tables required for MVP.
 
 Avoid creating tables for future features.
@@ -188,7 +190,7 @@ Use reusable components.
 
 Avoid unnecessary animations.
 
-Avoid complex state management.
+Use **Redux Toolkit + RTK Query** for state management and API calls.
 
 Do not optimize for edge cases before they exist.
 
