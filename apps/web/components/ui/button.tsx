@@ -48,14 +48,14 @@ function Button({
   asChild = false,
   children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   if (asChild) {
-    const child = React.Children.only(children) as React.ReactElement
+    const child = React.Children.only(children) as React.ReactElement<{ className?: string }>
     return React.cloneElement(child, {
       className: cn(buttonVariants({ variant, size, className }), child.props.className),
       "data-slot": "button",
       ...props,
-    })
+    } as Record<string, unknown>)
   }
 
   return (

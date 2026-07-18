@@ -1,4 +1,8 @@
-import { AiProvider, GenerateQuestionsParams, EvaluateAnswerParams } from '../interfaces/ai-provider.interface';
+import {
+  AiProvider,
+  GenerateQuestionsParams,
+  EvaluateAnswerParams,
+} from '../interfaces/ai-provider.interface';
 
 export class OpenRouterProvider implements AiProvider {
   constructor(

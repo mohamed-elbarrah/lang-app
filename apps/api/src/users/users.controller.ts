@@ -1,9 +1,11 @@
 import {
   Controller,
   Get,
+  Patch,
   Delete,
   Param,
   Query,
+  Body,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -32,6 +34,11 @@ export class UsersController {
   @UseGuards(AdminGuard)
   findOne(@Param('id') id: string) {
     return this.usersService.findById(id);
+  }
+
+  @Patch('me')
+  updateMe(@CurrentUser('id') userId: string, @Body() body: { name?: string }) {
+    return this.usersService.update(userId, body);
   }
 
   @Delete(':id')

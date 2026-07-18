@@ -14,7 +14,9 @@ export class UsersService {
       ? {
           OR: [
             { name: { contains: params.search, mode: 'insensitive' as const } },
-            { email: { contains: params.search, mode: 'insensitive' as const } },
+            {
+              email: { contains: params.search, mode: 'insensitive' as const },
+            },
           ],
         }
       : {};

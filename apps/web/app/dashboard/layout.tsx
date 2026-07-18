@@ -1,15 +1,30 @@
+'use client'
+
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, LayoutDashboard, FileText, History, User as UserIcon, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useAppSelector } from "@/lib/hooks";
+import { useLogoutMutation } from "@/lib/features/auth-api-slice";
+import { useRouter } from "next/navigation";
+import AuthGuard from "@/components/auth/auth-guard";
+import SessionProvider from "@/components/auth/session-provider";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardSidebar({ children }: { children: React.ReactNode }) {
+  const { user } = useAppSelector((s) => s.auth)
+  const [logout] = useLogoutMutation()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap()
+      router.replace('/')
+    } catch {
+      router.replace('/')
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-muted/20">
-      {/* Sidebar */}
       <aside className="w-64 border-r bg-background hidden md:flex flex-col">
         <div className="h-16 flex items-center px-6 border-b">
           <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
@@ -36,16 +51,13 @@ export default function DashboardLayout({
           </Link>
         </nav>
         <div className="p-4 border-t">
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" asChild>
-            <Link href="/login">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Link>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
           </Button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-background flex items-center px-6 justify-between md:justify-end shrink-0">
           <div className="flex items-center gap-2 font-bold text-lg md:hidden">
@@ -53,9 +65,9 @@ export default function DashboardLayout({
             <span>GrammarAI</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-sm font-medium hidden sm:block">user@example.com</div>
+            <div className="text-sm font-medium hidden sm:block">{user?.email}</div>
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-              U
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
           </div>
         </header>
@@ -66,5 +78,21 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <SessionProvider>
+      <AuthGuard>
+        <DashboardSidebar>
+          {children}
+        </DashboardSidebar>
+      </AuthGuard>
+    </SessionProvider>
   );
 }

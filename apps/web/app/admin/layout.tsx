@@ -1,15 +1,30 @@
+'use client'
+
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, LayoutDashboard, Users, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useAppSelector } from "@/lib/hooks";
+import AdminGuard from "@/components/auth/admin-guard";
+import SessionProvider from "@/components/auth/session-provider";
+import { useLogoutMutation } from "@/lib/features/auth-api-slice";
+import { useRouter } from "next/navigation";
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AdminSidebar({ children }: { children: React.ReactNode }) {
+  const { user } = useAppSelector((s) => s.auth)
+  const [logout] = useLogoutMutation()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap()
+      router.replace('/')
+    } catch {
+      router.replace('/')
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-muted/20">
-      {/* Sidebar */}
       <aside className="w-64 border-r bg-background hidden md:flex flex-col">
         <div className="h-16 flex items-center px-6 border-b">
           <Link href="/admin" className="flex items-center gap-2 font-bold text-lg">
@@ -32,16 +47,13 @@ export default function AdminLayout({
           </Link>
         </nav>
         <div className="p-4 border-t">
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" asChild>
-            <Link href="/dashboard">
-              <LogOut className="h-4 w-4 mr-2" />
-              Exit Admin
-            </Link>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Exit Admin
           </Button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-background flex items-center px-6 justify-between md:justify-end shrink-0">
           <div className="flex items-center gap-2 font-bold text-lg md:hidden">
@@ -49,9 +61,9 @@ export default function AdminLayout({
             <span>Admin Area</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-sm font-medium hidden sm:block">Admin User</div>
+            <div className="text-sm font-medium hidden sm:block">{user?.email}</div>
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
-              A
+              {user?.name?.charAt(0)?.toUpperCase() || 'A'}
             </div>
           </div>
         </header>
@@ -62,5 +74,21 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+  )
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <SessionProvider>
+      <AdminGuard>
+        <AdminSidebar>
+          {children}
+        </AdminSidebar>
+      </AdminGuard>
+    </SessionProvider>
   );
 }

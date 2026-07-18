@@ -36,7 +36,11 @@ export class AuthController {
       );
     }
 
-    return response.user;
+    const fullUser = await this.prisma.user.findUnique({
+      where: { id: response.user.id },
+    });
+
+    return fullUser;
   }
 
   @Post('signin')
@@ -59,7 +63,11 @@ export class AuthController {
       );
     }
 
-    return response.user;
+    const fullUser = await this.prisma.user.findUnique({
+      where: { id: response.user.id },
+    });
+
+    return fullUser;
   }
 
   @Post('signout')
