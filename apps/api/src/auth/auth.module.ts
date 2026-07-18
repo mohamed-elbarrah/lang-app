@@ -1,10 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { SessionMiddleware } from './session.middleware';
 import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(SessionMiddleware).forRoutes('{*path}');
+  }
+}

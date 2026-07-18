@@ -1,159 +1,107 @@
-# Turborepo starter
+# Lang App
 
-This Turborepo starter is maintained by the Turborepo core team.
+AI-powered English Grammar Test Platform.
 
-## Using this example
+## Stack
 
-Run the following command:
+- **Monorepo:** Turborepo + pnpm
+- **Backend:** NestJS (apps/api)
+- **Frontend:** Next.js 16 (apps/web)
+- **Database:** PostgreSQL 16 + Prisma ORM v6
+- **Auth:** Better Auth v1 (self-hosted in NestJS)
+- **UI:** Tailwind CSS 4 + shadcn/ui
 
-```sh
-npx create-turbo@latest
-```
+## Getting Started
 
-## What's inside?
+### Prerequisites
 
-This Turborepo includes the following packages/apps:
+- Node.js >= 20
+- pnpm
+- Docker (for PostgreSQL)
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+### Setup
 
 ```sh
-cd my-turborepo
-turbo build
+# Install dependencies
+pnpm install
+
+# Start PostgreSQL
+docker compose up -d
+
+# Generate Prisma client
+cd apps/api && npx prisma generate
+
+# Push schema and seed
+npx prisma db push && npx prisma db seed
+
+# Start API dev server
+cd apps/api && npx nest start --watch
 ```
 
-Without global `turbo`, use your package manager:
+### Default Admin
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+```
+Email:    admin@langapp.com
+Password: admin123
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## API Endpoints (Phase 2)
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+All endpoints are prefixed with `/api`.
 
-```sh
-turbo build --filter=docs
+### Health
+
+```
+GET /api/health
 ```
 
-Without global `turbo`:
+### Auth
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/signup` | Create account + set session cookie |
+| POST | `/api/signin` | Sign in + set session cookie |
+| POST | `/api/signout` | Sign out + clear session cookie |
+| GET | `/api/session` | Get current user + session from cookie |
+
+**Signup body:** `{ email, password, name? }`
+**Signin body:** `{ email, password }`
+
+### Users
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/users` | Admin | List users (paginated, searchable) |
+| GET | `/api/users/me` | User | Get current user profile |
+| GET | `/api/users/:id` | User | Get user by ID |
+| DELETE | `/api/users/:id` | Admin | Delete user |
+
+All responses are wrapped in `{ success: true, data: ... }` or `{ success: false, error: ... }`.
+
+## Auth Architecture
+
+Better Auth runs inside NestJS (not as a separate server). Auth actions (signup, signin) use Better Auth's internal API methods (`signUpEmail`, `signInEmail`) which handle password hashing and session creation in the database. Session validation uses direct Prisma queries on the `session` table rather than Better Auth's signed-cookie verification, avoiding compatibility issues with NestJS/Express.
+
+### Key files
+
+- `apps/api/src/auth/better-auth.ts` — Better Auth config (Prisma adapter, email/password)
+- `apps/api/src/auth/auth.controller.ts` — Auth routes (signup, signin, signout, session)
+- `apps/api/src/auth/session.middleware.ts` — Middleware that sets `req.user` from session cookie
+- `apps/api/src/auth/auth.module.ts` — Module wiring
+- `apps/api/src/prisma/` — Prisma service and module (global singleton)
+- `apps/api/prisma/seed.ts` — Seeds admin user via Better Auth API + default AI provider
+
+## Environment
+
+Copy `apps/api/.env` with:
+
+```
+DATABASE_URL=postgresql://langapp:langapp@localhost:5433/langapp
+BETTER_AUTH_SECRET=change-me-to-a-random-string-at-least-32-chars
+BETTER_AUTH_URL=http://localhost:3001
+PORT=3001
 ```
 
-### Develop
+## Database
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+PostgreSQL runs on port 5433 (mapped from 5432 inside container). Prisma v6.19.3 is used (v7 requires a config format incompatible with NestJS).

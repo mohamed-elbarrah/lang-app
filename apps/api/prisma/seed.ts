@@ -1,35 +1,39 @@
 import { PrismaClient } from '@prisma/client';
-import * as crypto from 'crypto';
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
-
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto
-    .pbkdf2Sync(password, salt, 1000, 64, 'sha512')
-    .toString('hex');
-  return `${salt}:${hash}`;
-}
 
 async function main() {
   const adminEmail = 'admin@langapp.com';
 
-  const existing = await prisma.user.findUnique({
+  const existingUser = await prisma.user.findUnique({
     where: { email: adminEmail },
   });
 
-  if (!existing) {
-    await prisma.user.create({
-      data: {
-        name: 'Admin',
+  if (existingUser) {
+    console.log('Admin user already exists');
+  } else {
+    const auth = betterAuth({
+      database: prismaAdapter(prisma, { provider: 'postgresql' }),
+      emailAndPassword: { enabled: true },
+    });
+
+    await auth.api.signUpEmail({
+      body: {
         email: adminEmail,
-        passwordHash: hashPassword('admin123'),
-        role: 'admin',
+        password: 'admin123',
+        name: 'Admin',
       },
     });
+
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: { role: 'admin', emailVerified: true },
+    });
+
     console.log('Admin user created');
-  } else {
-    console.log('Admin user already exists');
   }
 
   const providerCount = await prisma.aiProvider.count();

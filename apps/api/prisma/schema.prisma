@@ -7,14 +7,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         String   @default("user")
+model user {
+  id           String    @id @default(cuid())
+  name         String?
+  email        String    @unique
+  emailVerified Boolean  @default(false)
+  image        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  role         String    @default("user")
+
+  sessions  session[]
+  accounts  account[]
+  exams     Exam[]
+}
+
+model session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model account {
+  id           String   @id @default(cuid())
+  accountId    String
+  providerId   String
+  userId       String
+  user         user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken  String?
+  refreshToken String?
+  idToken      String?
+  password     String?
+  expiresAt    DateTime?
   createdAt    DateTime @default(now())
-  exams        Exam[]
+  updatedAt    DateTime @updatedAt
+}
+
+model verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Lesson {
@@ -28,7 +69,7 @@ model Lesson {
 model Exam {
   id             String     @id @default(uuid())
   userId         String
-  user           User       @relation(fields: [userId], references: [id])
+  user           user       @relation(fields: [userId], references: [id])
   questionCount  Int
   correctionMode String     @default("final")
   status         String     @default("in_progress")
