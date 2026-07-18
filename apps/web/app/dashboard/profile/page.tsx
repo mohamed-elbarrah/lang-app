@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAppSelector } from '@/lib/hooks'
+import { useUpdateMeMutation } from '@/lib/features/users-api-slice'
+import { Loader2 } from "lucide-react"
 
 const profileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -18,6 +20,7 @@ type ProfileForm = z.infer<typeof profileSchema>
 
 export default function ProfilePage() {
   const { user } = useAppSelector((s) => s.auth)
+  const [updateMe, { isLoading }] = useUpdateMeMutation()
   const [saved, setSaved] = useState(false)
 
   const {
@@ -31,13 +34,7 @@ export default function ProfilePage() {
 
   const onSubmit = async (data: ProfileForm) => {
     try {
-      const res = await fetch('/api/users/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) throw new Error('Failed to update')
+      await updateMe({ name: data.name }).unwrap()
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -73,9 +70,18 @@ export default function ProfilePage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit">
-              {saved ? 'Saved!' : 'Save Changes'}
-            </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Saving...
+              </>
+            ) : saved ? (
+              'Saved!'
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
           </CardFooter>
         </form>
       </Card>

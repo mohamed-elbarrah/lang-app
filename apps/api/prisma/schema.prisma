@@ -58,12 +58,24 @@ model verification {
   updatedAt  DateTime @updatedAt
 }
 
-model Lesson {
+model LessonPart {
   id        String   @id @default(uuid())
-  title     String
-  content   String
-  topic     String
+  name      String
+  order     Int      @unique
   createdAt DateTime @default(now())
+  lessons   Lesson[]
+}
+
+model Lesson {
+  id         String   @id @default(uuid())
+  partId     String
+  part       LessonPart @relation(fields: [partId], references: [id])
+  order      Int
+  title      String
+  definition String
+  rule       String
+  examples   Json
+  createdAt  DateTime @default(now())
 }
 
 model Exam {
@@ -71,6 +83,7 @@ model Exam {
   userId         String
   user           user       @relation(fields: [userId], references: [id])
   questionCount  Int
+  contentHash    String?    @unique
   correctionMode String     @default("final")
   status         String     @default("in_progress")
   score          Int?
