@@ -8,6 +8,7 @@ import {
 import { ResultsService } from './results.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('results')
 @UseGuards(AuthGuard)
@@ -17,13 +18,9 @@ export class ResultsController {
   @Get()
   findAll(
     @CurrentUser('id') userId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: PaginationDto,
   ) {
-    return this.resultsService.findAll(userId, {
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+    return this.resultsService.findAll(userId, query);
   }
 
   @Get(':examId')

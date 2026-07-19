@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { loggingBaseQuery } from '../logging-base-query'
 
 export interface UserProfile {
   id: string
@@ -10,12 +11,20 @@ export interface UserProfile {
   joinedAt: string
 }
 
+export interface PaginatedUsers {
+  data: UserProfile[]
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
 export const usersApi = createApi({
   reducerPath: 'usersApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-  }),
-  tagTypes: ['User'],
+  baseQuery: loggingBaseQuery,
+  tagTypes: ['User', 'Users'],
   endpoints: (builder) => ({
     getMe: builder.query<UserProfile, void>({
       query: () => '/users/me',
@@ -29,7 +38,21 @@ export const usersApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+    getUsers: builder.query<PaginatedUsers, { page?: number; limit?: number; search?: string }>({
+      query: (params) => ({
+        url: '/users',
+        params,
+      }),
+      providesTags: ['Users'],
+    }),
+    deleteUser: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/users/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Users'],
+    }),
   }),
 })
 
-export const { useGetMeQuery, useUpdateMeMutation } = usersApi
+export const { useGetMeQuery, useUpdateMeMutation, useGetUsersQuery, useDeleteUserMutation } = usersApi

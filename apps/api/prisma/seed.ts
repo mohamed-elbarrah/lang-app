@@ -441,7 +441,12 @@ const lessons = [
 ];
 
 async function main() {
-  const adminEmail = 'admin@langapp.com';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@langapp.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+
+  if (process.env.NODE_ENV === 'production' && adminPassword === 'admin123') {
+    console.warn('WARNING: Using default admin password in production is insecure. Set ADMIN_PASSWORD env var.');
+  }
 
   const existingUser = await prisma.user.findUnique({
     where: { email: adminEmail },
@@ -458,7 +463,7 @@ async function main() {
     await auth.api.signUpEmail({
       body: {
         email: adminEmail,
-        password: 'admin123',
+        password: adminPassword,
         name: 'Admin',
       },
     });

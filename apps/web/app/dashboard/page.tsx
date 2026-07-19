@@ -10,11 +10,7 @@ import { useGetUserStatsQuery } from "@/lib/features/dashboard-api-slice"
 
 export default function DashboardPage() {
   const { user } = useAppSelector((s) => s.auth)
-  const { data: rawStats, isLoading, error } = useGetUserStatsQuery()
-
-  const stats = rawStats && typeof rawStats === 'object' && 'data' in rawStats
-    ? (rawStats as any).data
-    : rawStats
+  const { data: stats, isLoading, error } = useGetUserStatsQuery()
 
   return (
     <div className="space-y-8">

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, Clock } from "lucide-react"
 import Link from "next/link"
 import { useCreateExamMutation } from '@/lib/features/exams-api-slice'
 
@@ -25,6 +25,7 @@ export default function NewTestPage() {
   const [selectedParts, setSelectedParts] = useState<string[]>([])
   const [parts, setParts] = useState<LessonPart[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     fetch('/api/lessons')
@@ -40,19 +41,20 @@ export default function NewTestPage() {
 
   const handleSubmit = async () => {
     setError(null)
+    setGenerating(true)
     try {
-      const raw = await createExam({
+      const exam = await createExam({
         questionCount: parseInt(questionCount, 10),
         partIds: selectedParts.length > 0 ? selectedParts : undefined,
         correctionMode: correctionMode as 'instant' | 'final',
       }).unwrap()
 
-      const exam = raw && typeof raw === 'object' && 'data' in raw ? (raw as any).data : raw
       router.push(`/dashboard/test/${exam.id}`)
     } catch (err: unknown) {
+      setGenerating(false)
       const message =
         err && typeof err === 'object' && 'data' in err
-          ? String((err as { data: { message?: string } }).data?.message ?? 'Failed to create exam')
+          ? String((err as { data: { error?: { message?: string } } }).data?.error?.message ?? 'Failed to create exam')
           : 'Failed to create exam'
       setError(message)
     }
@@ -61,6 +63,22 @@ export default function NewTestPage() {
   const togglePart = (partId: string) => {
     setSelectedParts((prev) =>
       prev.includes(partId) ? prev.filter((id) => id !== partId) : [...prev, partId],
+    )
+  }
+
+  if (generating) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 text-center py-12">
+        <Clock className="h-16 w-16 text-primary mx-auto animate-pulse" />
+        <h1 className="text-3xl font-bold">Generating Your Exam</h1>
+        <p className="text-muted-foreground">
+          Please wait while we prepare your questions using AI. This may take a few seconds...
+        </p>
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+        <Button variant="outline" onClick={() => { setGenerating(false); router.push('/dashboard') }}>
+          Cancel
+        </Button>
+      </div>
     )
   }
 
@@ -91,12 +109,14 @@ export default function NewTestPage() {
                 <SelectValue placeholder="Select amount" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="10">10 Questions (Quick)</SelectItem>
-                <SelectItem value="15">15 Questions (Standard)</SelectItem>
+                <SelectItem value="3">3 Questions (Quick)</SelectItem>
+                <SelectItem value="5">5 Questions (Mini)</SelectItem>
+                <SelectItem value="10">10 Questions (Standard)</SelectItem>
+                <SelectItem value="15">15 Questions (Extended)</SelectItem>
                 <SelectItem value="20">20 Questions (Comprehensive)</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">The test must have between 10 and 20 questions.</p>
+            <p className="text-sm text-muted-foreground">Choose between 3 and 20 questions.</p>
           </div>
 
           <div className="space-y-3">

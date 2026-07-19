@@ -13,6 +13,7 @@ import { AuthGuard } from '../common/guards/auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { UpdateUserDto } from '../common/dto/update-user.dto';
 
 @Controller('users')
 @UseGuards(AuthGuard)
@@ -37,7 +38,7 @@ export class UsersController {
   }
 
   @Patch('me')
-  updateMe(@CurrentUser('id') userId: string, @Body() body: { name?: string }) {
+  updateMe(@CurrentUser('id') userId: string, @Body() body: UpdateUserDto) {
     return this.usersService.update(userId, body);
   }
 

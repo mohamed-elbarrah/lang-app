@@ -45,6 +45,7 @@ export class UsersService {
         name: u.name,
         email: u.email,
         role: u.role,
+        image: null,
         testsTaken: u._count.exams,
         joinedAt: u.createdAt,
       })),
@@ -93,11 +94,29 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { name: data.name },
-      select: { id: true, name: true, email: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        image: true,
+        createdAt: true,
+        _count: { select: { exams: true } },
+      },
     });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      image: updated.image,
+      testsTaken: updated._count.exams,
+      joinedAt: updated.createdAt,
+    };
   }
 
   async delete(id: string) {

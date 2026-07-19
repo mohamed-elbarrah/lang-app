@@ -13,11 +13,7 @@ import { useGetResultsQuery } from '@/lib/features/results-api-slice'
 
 export default function ResultsPage() {
   const [search, setSearch] = useState('')
-  const { data: rawData, isLoading, error, refetch } = useGetResultsQuery({ page: 1, limit: 50 })
-
-  const results = rawData && typeof rawData === 'object' && 'data' in rawData
-    ? (rawData as any).data
-    : rawData
+  const { data: results, isLoading, error, refetch } = useGetResultsQuery({ page: 1, limit: 50 })
 
   const list = results?.data || []
   const filtered = search

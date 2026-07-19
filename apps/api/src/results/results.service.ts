@@ -77,8 +77,11 @@ export class ResultsService {
       .map((q) => q.lessonTopic as string)
       .filter((v, i, a) => a.indexOf(v) === i);
 
+    const safeQuestions = exam.questions.map(({ answerKey, ...q }) => q);
+
     return {
       ...exam,
+      questions: safeQuestions,
       summary: {
         correctCount,
         incorrectCount,

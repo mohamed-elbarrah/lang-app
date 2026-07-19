@@ -1,10 +1,12 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { loggingBaseQuery } from '../logging-base-query'
 
 export interface AiProvider {
   id: string
   name: string
   providerType: string
-  apiKey: string
+  apiKey: string | null
+  hasApiKey: boolean
   baseUrl: string | null
   isActive: boolean
   defaultModel: string | null
@@ -38,9 +40,7 @@ export interface UpdateAiProviderInput {
 
 export const aiProvidersApi = createApi({
   reducerPath: 'aiProvidersApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-  }),
+  baseQuery: loggingBaseQuery,
   tagTypes: ['AIProviders', 'AIProvider'],
   endpoints: (builder) => ({
     getAIProviders: builder.query<AiProvider[], void>({

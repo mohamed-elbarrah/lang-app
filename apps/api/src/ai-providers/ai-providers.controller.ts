@@ -6,11 +6,16 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AiProvidersService } from './ai-providers.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CreateAiProviderDto } from '../common/dto/create-ai-provider.dto';
+import { UpdateAiProviderDto } from '../common/dto/update-ai-provider.dto';
+import { UpdateProviderModelsDto } from '../common/dto/update-provider-models.dto';
+import { TestConnectionDto } from '../common/dto/test-connection.dto';
 
 @Controller('ai-providers')
 @UseGuards(AuthGuard, AdminGuard)
@@ -23,17 +28,7 @@ export class AiProvidersController {
   }
 
   @Post()
-  create(
-    @Body()
-    body: {
-      name: string;
-      providerType: string;
-      apiKey: string;
-      baseUrl?: string;
-      defaultModel?: string;
-      isActive?: boolean;
-    },
-  ) {
+  create(@Body() body: CreateAiProviderDto) {
     return this.aiProvidersService.create(body);
   }
 
@@ -43,17 +38,7 @@ export class AiProvidersController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body()
-    body: {
-      name?: string;
-      apiKey?: string;
-      baseUrl?: string;
-      defaultModel?: string;
-      isActive?: boolean;
-    },
-  ) {
+  update(@Param('id') id: string, @Body() body: UpdateAiProviderDto) {
     return this.aiProvidersService.update(id, body);
   }
 
@@ -63,20 +48,17 @@ export class AiProvidersController {
   }
 
   @Post('test-connection')
-  testConnection(@Body() body: { id: string }) {
+  testConnection(@Body() body: TestConnectionDto) {
     return this.aiProvidersService.testConnection(body.id);
   }
 
   @Get(':id/models')
-  getModels(@Param('id') id: string) {
-    return this.aiProvidersService.fetchModels(id);
+  getModels(@Param('id') id: string, @Query('apiKey') apiKey?: string) {
+    return this.aiProvidersService.fetchModels(id, apiKey);
   }
 
   @Patch(':id/models')
-  updateModels(
-    @Param('id') id: string,
-    @Body() body: { models: { id: string; isEnabled: boolean }[] },
-  ) {
+  updateModels(@Param('id') id: string, @Body() body: UpdateProviderModelsDto) {
     return this.aiProvidersService.updateModels(id, body);
   }
 }

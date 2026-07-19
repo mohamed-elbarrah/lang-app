@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { loggingBaseQuery } from '../logging-base-query'
 
 export interface QuestionReview {
   id: string
@@ -9,6 +10,7 @@ export interface QuestionReview {
   explanation: string | null
   order: number
   lessonTopic: string | null
+  correctAnswer: string | null
 }
 
 export interface ExamResult {
@@ -51,9 +53,7 @@ export interface PaginatedResults {
 
 export const resultsApi = createApi({
   reducerPath: 'resultsApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-  }),
+  baseQuery: loggingBaseQuery,
   tagTypes: ['Results', 'Result'],
   endpoints: (builder) => ({
     getResults: builder.query<PaginatedResults, { page?: number; limit?: number }>({

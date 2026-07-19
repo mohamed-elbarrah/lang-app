@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { loggingBaseQuery } from '../logging-base-query'
 
 export interface RecentExam {
   id: string
@@ -28,9 +29,7 @@ export interface AdminStats {
 
 export const dashboardApi = createApi({
   reducerPath: 'dashboardApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-  }),
+  baseQuery: loggingBaseQuery,
   tagTypes: ['UserStats', 'AdminStats'],
   endpoints: (builder) => ({
     getUserStats: builder.query<UserStats, void>({

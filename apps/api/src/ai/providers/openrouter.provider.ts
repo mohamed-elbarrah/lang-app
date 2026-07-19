@@ -7,8 +7,6 @@ import {
 interface OpenRouterModel {
   id: string;
   name: string;
-  created?: number;
-  description?: string;
 }
 
 interface OpenRouterModelsResponse {
@@ -45,25 +43,40 @@ export class OpenRouterProvider implements AiProvider {
 
   async generateQuestions(params: GenerateQuestionsParams): Promise<string> {
     const randomSeed = Date.now();
-    const prompt = `You are an English grammar test generator. Generate ${params.count} questions based on the following lesson content. Each lesson includes its part (group), definition, grammar rule, and example sentences.
+    const prompt = `You are an English grammar test generator. Generate ${params.count} questions based on the following lesson content.
 
 Lesson content:
 ${params.lessons}
 
-Generate exactly ${params.count} questions. Distribute the questions across different lessons and types. Avoid repetitive or overly similar questions. Be creative.
+Generate exactly ${params.count} questions. Distribute the questions across different lessons and types.
 
 Each question must be a JSON object with these fields:
 - "type": one of "multiple_choice", "fill_blank", "error_correction", "sentence_creation", "scenario"
-- "content": an object containing the question data. Structure depends on type:
-  * multiple_choice: { "question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "A" }
-  * fill_blank: { "sentence": "... ____ ...", "correctAnswer": "word" }
-  * error_correction: { "sentence": "...", "error": "...", "correctAnswer": "..." }
-  * sentence_creation: { "instruction": "...", "criteria": "...", "correctAnswer": "..." }
-  * scenario: { "scenario": "...", "question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "B" }
+- "content": an object containing ONLY the public question data (NO answer key):
+  * multiple_choice: { "instruction": "Choose the correct option.", "question": "...", "options": [{ "label": "A", "text": "..." }, { "label": "B", "text": "..." }] }
+  * fill_blank: { "instruction": "Fill in the blank.", "sentence": "... ____ ..." }
+  * error_correction: { "instruction": "Find and correct the error.", "sentence": "..." }
+  * sentence_creation: { "instruction": "Create a sentence.", "criteria": "..." }
+  * scenario: { "instruction": "Choose the best response.", "scenario": "...", "question": "...", "options": [{ "label": "A", "text": "..." }, { "label": "B", "text": "..." }] }
+- "answerKey": an object containing the correct answer (NEVER included in content):
+  * multiple_choice: { "correctAnswer": "A" }
+  * fill_blank: { "correctAnswer": "word1|word2|word3" } — use pipe for multiple acceptable answers
+  * error_correction: { "correctAnswer": "..." }
+  * sentence_creation: { "correctAnswer": "..." }
+  * scenario: { "correctAnswer": "A" }
+- "explanation": string (pedagogical explanation of the correct answer — for error_correction, explain what the error was and why)
 - "order": a number starting from 1
 - "lessonTopic": the title of the lesson this question is based on
 
-Return a JSON object with a "questions" array containing all generated questions. Use variety and creativity. Random seed: ${randomSeed}.`;
+IMPORTANT: The "answerKey" must NEVER be inside "content". They must be separate fields.
+
+CRITICAL format rules:
+- Options must use { "label": "A", "text": "..." } format. Label is a single uppercase letter. Text is the full option text.
+- For fill_blank embedding "____" (4 underscores) in the sentence as the blank marker.
+- For error_correction, do NOT include an "error" field in content. The student must find the error themselves. Include the error explanation in the "explanation" field instead.
+- Make the "instruction" field specific to the question content, not generic.
+
+Return a JSON object with a "questions" array. Random seed: ${randomSeed}.`;
 
     const response = await this.chatCompletion([
       { role: 'system', content: 'You are an English grammar test generator. Always respond with valid JSON. Create varied, non-repetitive questions.' },
@@ -85,11 +98,10 @@ Return a JSON object with:
 - "isCorrect": boolean (true if fully correct)
 - "score": number between 0 and 100
 - "feedback": string (brief feedback to the student)
-- "correctionHint": string (if wrong, hint toward the right answer)
-- "explanation": string (detailed pedagogical explanation including the grammar rule being tested, why the correct answer is right, and 1-2 example sentences for reinforcement)`;
+- "explanation": string (detailed pedagogical explanation including the grammar rule being tested)`;
 
     const response = await this.chatCompletion([
-      { role: 'system', content: 'You are an English teacher evaluating student answers. Always respond with valid JSON. Provide clear pedagogical explanations that help students learn.' },
+      { role: 'system', content: 'You are an English teacher evaluating student answers. Always respond with valid JSON.' },
       { role: 'user', content: prompt },
     ], 0.3, 1500);
 
@@ -102,10 +114,7 @@ Return a JSON object with:
 Question: ${params.question}
 Correct Answer: ${params.correctAnswer}
 
-Provide a clear, pedagogical explanation suitable for an English learner. Include:
-- Why the correct answer is right
-- The grammar rule being tested
-- Common mistakes to avoid
+Provide a clear, pedagogical explanation suitable for an English learner.
 
 Return a JSON object with:
 - "explanation": string (the full explanation)
@@ -163,6 +172,7 @@ Return a JSON object with:
       messages,
       temperature,
       max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
     };
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -177,8 +187,10 @@ Return a JSON object with:
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
+      const safeMessage = response.status >= 500
+        ? `AI provider server error (${response.status})`
+        : `AI provider request failed (${response.status})`;
+      throw new Error(safeMessage);
     }
 
     const json = (await response.json()) as ChatCompletionResponse;

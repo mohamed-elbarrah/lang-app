@@ -24,10 +24,7 @@ import {
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 
 export default function AdminAIProviderPage() {
-  const { data: rawProviders, isLoading, error: queryError, refetch } = useGetAIProvidersQuery()
-  const providers = rawProviders && typeof rawProviders === 'object' && 'data' in rawProviders
-    ? (rawProviders as any).data
-    : rawProviders
+  const { data: providers, isLoading, error: queryError, refetch } = useGetAIProvidersQuery()
   const [createProvider, { isLoading: isCreating }] = useCreateAIProviderMutation()
   const [updateProvider, { isLoading: isUpdating }] = useUpdateAIProviderMutation()
   const [deleteProvider, { isLoading: isDeleting }] = useDeleteAIProviderMutation()
@@ -43,6 +40,7 @@ export default function AdminAIProviderPage() {
   const [connectionResult, setConnectionResult] = useState<'idle' | 'success' | 'fail' | 'testing'>('idle')
   const [models, setModels] = useState<ProviderModel[]>([])
   const [dirty, setDirty] = useState(false)
+  const [keyDirty, setKeyDirty] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [modelSearch, setModelSearch] = useState('')
@@ -52,7 +50,8 @@ export default function AdminAIProviderPage() {
 
   useEffect(() => {
     if (provider) {
-      setApiKey(provider.apiKey || '')
+      setApiKey('')
+      setKeyDirty(false)
       setDefaultModel(provider.defaultModel || '')
       setBaseUrl(provider.baseUrl || DEFAULT_BASE_URL)
       setModels(provider.models || [])
@@ -68,15 +67,16 @@ export default function AdminAIProviderPage() {
     autoFetchTimer.current = setTimeout(async () => {
       setAutoFetching(true)
       try {
-        const res = await fetch(`/api/ai-providers/${provider!.id}/models`, {
-          credentials: 'include',
-        })
+        const res = await fetch(
+          `/api/ai-providers/${provider.id}/models?apiKey=${encodeURIComponent(apiKey)}`,
+          { credentials: 'include' },
+        )
         if (res.ok) {
           const body = await safeParseJson(res)
           setModels(body.data || [])
         }
       } catch {
-        /* silent — models will just not load */
+        /* silent */
       } finally {
         setAutoFetching(false)
       }
@@ -119,7 +119,8 @@ export default function AdminAIProviderPage() {
     setPageError(null)
     if (isAuto) setAutoFetching(true)
     try {
-      const res = await fetch(`/api/ai-providers/${provider.id}/models`, {
+      const params = apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : ''
+      const res = await fetch(`/api/ai-providers/${provider.id}/models${params}`, {
         credentials: 'include',
       })
       const body = await safeParseJson(res)
@@ -173,17 +174,23 @@ export default function AdminAIProviderPage() {
     if (!provider) return
     setPageError(null)
     setSuccessMsg(null)
+    if (!provider.hasApiKey && !apiKey) {
+      setPageError('API key is required to activate the provider')
+      return
+    }
+    const data: Record<string, unknown> = {
+      isActive: true,
+    }
+    if (keyDirty && apiKey) data.apiKey = apiKey
+    if (defaultModel) data.defaultModel = defaultModel
+    if (baseUrl) data.baseUrl = baseUrl
     try {
       await updateProvider({
         id: provider.id,
-        data: {
-          apiKey: apiKey || undefined,
-          defaultModel: defaultModel || undefined,
-          baseUrl: baseUrl || undefined,
-          isActive: true,
-        },
+        data: data as any,
       }).unwrap()
       setDirty(false)
+      setKeyDirty(false)
       showSuccess('Configuration saved')
     } catch (err) {
       setPageError(err instanceof Error ? err.message : 'Failed to save configuration')
@@ -403,9 +410,10 @@ export default function AdminAIProviderPage() {
                 value={apiKey}
                 onChange={(e) => {
                   setApiKey(e.target.value)
+                  setKeyDirty(true)
                   setDirty(true)
                 }}
-                placeholder="Enter your API key"
+                placeholder={provider.hasApiKey ? 'Key configured (enter to replace)' : 'Enter your API key'}
               />
               <button
                 type="button"

@@ -1,7 +1,8 @@
 'use client'
 
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, LayoutDashboard, FileText, History, User as UserIcon, LogOut } from "lucide-react";
+import { CheckCircle2, LayoutDashboard, FileText, History, User as UserIcon, LogOut, AlertTriangle, X } from "lucide-react";
 import Link from "next/link";
 import { useAppSelector } from "@/lib/hooks";
 import { useLogoutMutation } from "@/lib/features/auth-api-slice";
@@ -13,6 +14,13 @@ function DashboardSidebar({ children }: { children: React.ReactNode }) {
   const { user } = useAppSelector((s) => s.auth)
   const [logout] = useLogoutMutation()
   const router = useRouter()
+  const [throttled, setThrottled] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setThrottled(true)
+    window.addEventListener('throttler-warning', handler)
+    return () => window.removeEventListener('throttler-warning', handler)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -59,6 +67,15 @@ function DashboardSidebar({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
+        {throttled && (
+          <div className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 border-b border-amber-200 px-6 py-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="flex-1">You are making too many requests. Please slow down.</span>
+            <button onClick={() => setThrottled(false)} className="shrink-0 hover:bg-amber-100 rounded p-0.5">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <header className="h-16 border-b bg-background flex items-center px-6 justify-between md:justify-end shrink-0">
           <div className="flex items-center gap-2 font-bold text-lg md:hidden">
             <CheckCircle2 className="h-6 w-6 text-primary" />

@@ -44,18 +44,17 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     setError(null)
     try {
-      const raw = await registerUser({
+      const user = await registerUser({
         email: data.email,
         password: data.password,
         name: data.name,
       }).unwrap()
-      const user = raw && typeof raw === 'object' && 'data' in raw ? (raw as any).data : raw
       dispatch(setUser(user))
       router.push(user?.role === 'admin' ? '/admin' : '/dashboard')
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'data' in err
-          ? String((err as { data: { message?: string } }).data?.message ?? 'Registration failed')
+          ? String((err as { data: { error?: { message?: string } } }).data?.error?.message ?? 'Registration failed')
           : 'Registration failed. Please try again.'
       setError(message)
     }

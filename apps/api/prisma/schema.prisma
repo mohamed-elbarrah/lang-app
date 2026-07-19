@@ -7,6 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  user
+  admin
+}
+
+enum ExamStatus {
+  generating
+  in_progress
+  completed
+}
+
+enum CorrectionMode {
+  instant
+  final
+}
+
+enum QuestionType {
+  multiple_choice
+  fill_blank
+  error_correction
+  sentence_creation
+  scenario
+}
+
+enum QuestionBankStatus {
+  active
+  deprecated
+  archived
+}
+
 model user {
   id           String    @id @default(cuid())
   name         String?
@@ -15,11 +45,11 @@ model user {
   image        String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  role         String    @default("user")
+  role         UserRole  @default(user)
 
-  sessions  session[]
-  accounts  account[]
-  exams     Exam[]
+  sessions session[]
+  accounts account[]
+  exams    Exam[]
 }
 
 model session {
@@ -32,6 +62,9 @@ model session {
   userAgent String?
   userId    String
   user      user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model account {
@@ -64,39 +97,49 @@ model LessonPart {
   order     Int      @unique
   createdAt DateTime @default(now())
   lessons   Lesson[]
+
+  @@index([order])
 }
 
 model Lesson {
-  id         String   @id @default(uuid())
+  id         String      @id @default(uuid())
   partId     String
-  part       LessonPart @relation(fields: [partId], references: [id])
+  part       LessonPart  @relation(fields: [partId], references: [id])
   order      Int
   title      String
   definition String
   rule       String
   examples   Json
-  createdAt  DateTime @default(now())
+  createdAt  DateTime    @default(now())
+  bankItems  QuestionBankItem[]
+
+  @@index([partId])
 }
 
 model Exam {
-  id             String     @id @default(uuid())
+  id             String         @id @default(uuid())
   userId         String
-  user           user       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           user           @relation(fields: [userId], references: [id], onDelete: Cascade)
   questionCount  Int
-  contentHash    String?    @unique
-  correctionMode String     @default("final")
-  status         String     @default("in_progress")
+  contentHash    String?
+  correctionMode CorrectionMode @default(final)
+  status         ExamStatus     @default(in_progress)
   score          Int?
-  createdAt      DateTime   @default(now())
+  createdAt      DateTime       @default(now())
   completedAt    DateTime?
   questions      Question[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+  @@index([completedAt])
 }
 
 model Question {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   examId        String
-  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-  type          String
+  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  type          QuestionType
   content       Json
   userAnswer    Json?
   correctAnswer String?
@@ -104,6 +147,57 @@ model Question {
   explanation   String?
   order         Int
   lessonTopic   String?
+  answerKey     Json?
+
+  @@index([examId])
+  @@index([examId, userAnswer])
+}
+
+model QuestionBankItem {
+  id           String             @id @default(uuid())
+  lessonId     String
+  lesson       Lesson             @relation(fields: [lessonId], references: [id])
+  type         QuestionType
+  content      Json
+  answerKey    Json
+  explanation  String
+  difficulty   Int                @default(1)
+  promptVersion String
+  model        String?
+  contentHash  String             @unique
+  status       QuestionBankStatus @default(active)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([lessonId])
+  @@index([lessonId, type])
+  @@index([contentHash])
+  @@index([status])
+}
+
+model ExamGenerationRequest {
+  id          String   @id @default(uuid())
+  fingerprint String   @unique
+  status      String   @default("pending")
+  result      Json?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([fingerprint])
+  @@index([status])
+}
+
+model AnswerEvaluation {
+  id            String   @id @default(uuid())
+  fingerprint   String   @unique
+  isCorrect     Boolean
+  score         Int?
+  feedback      String?
+  explanation   String?
+  createdAt     DateTime @default(now())
+
+  @@index([fingerprint])
 }
 
 model AiProvider {
@@ -115,6 +209,8 @@ model AiProvider {
   isActive      Boolean         @default(false)
   defaultModel  String?
   models        ProviderModel[]
+
+  @@index([isActive])
 }
 
 model ProviderModel {
@@ -124,4 +220,7 @@ model ProviderModel {
   modelId    String
   modelName  String
   isEnabled  Boolean    @default(false)
+
+  @@unique([providerId, modelId])
+  @@index([providerId])
 }

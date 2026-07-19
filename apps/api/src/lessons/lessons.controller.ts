@@ -11,6 +11,8 @@ import {
 import { LessonsService } from './lessons.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { CreateLessonDto } from '../common/dto/create-lesson.dto';
+import { UpdateLessonDto } from '../common/dto/update-lesson.dto';
 
 @Controller('lessons')
 export class LessonsController {
@@ -28,34 +30,13 @@ export class LessonsController {
 
   @Post()
   @UseGuards(AuthGuard, AdminGuard)
-  create(
-    @Body()
-    body: {
-      partId: string;
-      order: number;
-      title: string;
-      definition: string;
-      rule: string;
-      examples: string[];
-    },
-  ) {
+  create(@Body() body: CreateLessonDto) {
     return this.lessonsService.create(body);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard, AdminGuard)
-  update(
-    @Param('id') id: string,
-    @Body()
-    body: {
-      partId?: string;
-      order?: number;
-      title?: string;
-      definition?: string;
-      rule?: string;
-      examples?: string[];
-    },
-  ) {
+  update(@Param('id') id: string, @Body() body: UpdateLessonDto) {
     return this.lessonsService.update(id, body);
   }
 

@@ -11,6 +11,10 @@ import {
 import { ExamsService } from './exams.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateExamDto } from '../common/dto/create-exam.dto';
+import { SubmitAnswerDto } from '../common/dto/submit-answer.dto';
+import { UpdateExamModeDto } from '../common/dto/update-exam-mode.dto';
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @Controller('exams')
 @UseGuards(AuthGuard)
@@ -20,12 +24,7 @@ export class ExamsController {
   @Post()
   create(
     @CurrentUser('id') userId: string,
-    @Body()
-    body: {
-      questionCount?: number;
-      partIds?: string[];
-      correctionMode?: 'instant' | 'final';
-    },
+    @Body() body: CreateExamDto,
   ) {
     return this.examsService.create(userId, body);
   }
@@ -33,13 +32,9 @@ export class ExamsController {
   @Get()
   findAll(
     @CurrentUser('id') userId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: PaginationDto,
   ) {
-    return this.examsService.findAll(userId, {
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    });
+    return this.examsService.findAll(userId, query);
   }
 
   @Get(':id')
@@ -62,9 +57,17 @@ export class ExamsController {
   submitAnswer(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @Body() body: { questionId: string; answer: unknown },
+    @Body() body: SubmitAnswerDto,
   ) {
     return this.examsService.submitAnswer(id, userId, body);
+  }
+
+  @Post(':id/retake')
+  retake(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.examsService.retake(id, userId);
   }
 
   @Post(':id/complete')
@@ -79,7 +82,7 @@ export class ExamsController {
   switchMode(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @Body() body: { correctionMode: 'instant' | 'final' },
+    @Body() body: UpdateExamModeDto,
   ) {
     return this.examsService.switchMode(id, userId, body.correctionMode);
   }

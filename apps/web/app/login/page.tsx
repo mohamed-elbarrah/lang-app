@@ -39,14 +39,13 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setError(null)
     try {
-      const raw = await login(data).unwrap()
-      const user = raw && typeof raw === 'object' && 'data' in raw ? (raw as any).data : raw
+      const user = await login(data).unwrap()
       dispatch(setUser(user))
       router.push(user?.role === 'admin' ? '/admin' : '/dashboard')
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'data' in err
-          ? String((err as { data: { message?: string } }).data?.message ?? 'Login failed')
+          ? String((err as { data: { error?: { message?: string } } }).data?.error?.message ?? 'Login failed')
           : 'Login failed. Please try again.'
       setError(message)
     }

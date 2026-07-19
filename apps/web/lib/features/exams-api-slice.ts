@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { loggingBaseQuery } from '../logging-base-query'
 
 export interface Question {
   id: string
@@ -17,7 +18,7 @@ export interface Exam {
   userId: string
   questionCount: number
   correctionMode: 'instant' | 'final'
-  status: 'in_progress' | 'completed'
+  status: 'generating' | 'in_progress' | 'completed'
   score: number | null
   createdAt: string
   completedAt: string | null
@@ -63,10 +64,8 @@ export interface CreateExamInput {
 
 export const examsApi = createApi({
   reducerPath: 'examsApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-  }),
-  tagTypes: ['Exams', 'Exam'],
+  baseQuery: loggingBaseQuery,
+  tagTypes: ['Exams', 'Exam', 'Results'],
   endpoints: (builder) => ({
     createExam: builder.mutation<Exam, CreateExamInput>({
       query: (body) => ({
@@ -97,14 +96,14 @@ export const examsApi = createApi({
         method: 'POST',
         body: { questionId, answer },
       }),
-      invalidatesTags: (_result, _error, { examId }) => [{ type: 'Exam', id: examId }],
+      invalidatesTags: (_result, _error, { examId }) => ['Exams', { type: 'Exam', id: examId }, 'Results'],
     }),
     completeExam: builder.mutation<Exam, string>({
       query: (id) => ({
         url: `/exams/${id}/complete`,
         method: 'POST',
       }),
-      invalidatesTags: (_result, _error, id) => ['Exams', { type: 'Exam', id }],
+      invalidatesTags: (_result, _error, id) => ['Exams', { type: 'Exam', id }, 'Results'],
     }),
     switchMode: builder.mutation<Exam, { id: string; correctionMode: 'instant' | 'final' }>({
       query: ({ id, correctionMode }) => ({
@@ -112,7 +111,14 @@ export const examsApi = createApi({
         method: 'PATCH',
         body: { correctionMode },
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Exam', id }],
+      invalidatesTags: (_result, _error, { id }) => ['Exams', { type: 'Exam', id }],
+    }),
+    retakeExam: builder.mutation<Exam, string>({
+      query: (id) => ({
+        url: `/exams/${id}/retake`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Exams'],
     }),
   }),
 })
@@ -125,4 +131,5 @@ export const {
   useSubmitAnswerMutation,
   useCompleteExamMutation,
   useSwitchModeMutation,
+  useRetakeExamMutation,
 } = examsApi

@@ -1,17 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { validateEnv } from './config/env.config';
 
 async function bootstrap() {
+  const env = validateEnv();
+
   const app = await NestFactory.create(AppModule);
 
-  const configService = app.get(ConfigService);
-  const port = configService.get('PORT', 3001);
+  const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -23,7 +24,9 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(port);
-  console.log(`API running on http://localhost:${port}`);
+  app.enableShutdownHooks();
+
+  await app.listen(env.PORT);
+  console.log(`API running on http://localhost:${env.PORT}`);
 }
 bootstrap();

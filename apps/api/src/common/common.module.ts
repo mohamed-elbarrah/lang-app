@@ -1,13 +1,15 @@
-import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
-import { ResponseTransformInterceptor } from './interceptors/response-transform.interceptor';
+import { RequestIdMiddleware } from './middleware/request-id.middleware';
 
 @Module({
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
-    { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
   ],
-  exports: [],
 })
-export class CommonModule {}
+export class CommonModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('{*path}');
+  }
+}

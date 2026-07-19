@@ -1,22 +1,30 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { CheckCircle2, XCircle, ArrowLeft, AlertCircle, HelpCircle } from "lucide-react"
+import { CheckCircle2, XCircle, ArrowLeft, AlertCircle, HelpCircle, RotateCcw } from "lucide-react"
 import Link from "next/link"
 import { useGetResultDetailQuery } from '@/lib/features/results-api-slice'
+import { useRetakeExamMutation } from '@/lib/features/exams-api-slice'
 
 export default function ResultDetailsPage() {
   const params = useParams()
+  const router = useRouter()
   const examId = params.id as string
-  const { data: rawData, isLoading, error } = useGetResultDetailQuery(examId)
+  const { data: result, isLoading, error } = useGetResultDetailQuery(examId)
+  const [retakeExam, { isLoading: isRetaking }] = useRetakeExamMutation()
 
-  const result = rawData && typeof rawData === 'object' && 'data' in rawData
-    ? (rawData as any).data
-    : rawData
+  const handleRetake = async () => {
+    try {
+      const newExam = await retakeExam(examId).unwrap()
+      router.push(`/dashboard/test/${newExam.id}`)
+    } catch {
+      // handled by the global error boundary
+    }
+  }
 
   if (isLoading) {
     return (
@@ -65,7 +73,7 @@ export default function ResultDetailsPage() {
         <Button variant="ghost" size="icon" asChild>
           <Link href="/dashboard/results"><ArrowLeft className="h-5 w-5" /></Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">Exam Result</h1>
           <p className="text-muted-foreground mt-1">
             {result.completedAt
@@ -73,6 +81,10 @@ export default function ResultDetailsPage() {
               : 'Not yet completed'}
           </p>
         </div>
+        <Button onClick={handleRetake} disabled={isRetaking}>
+          <RotateCcw className="h-4 w-4 mr-2" />
+          {isRetaking ? 'Creating...' : 'Re-take Exam'}
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -133,18 +145,23 @@ export default function ResultDetailsPage() {
             const isUnanswered = question.isCorrect === null
 
             const content = question.content || {}
-            const questionText = content.question || content.sentence || content.scenario || content.instruction || ''
-            const options = content.options as string[] | undefined
+            const instruction = String(content.instruction || '')
+            const questionText = String(content.question || content.sentence || content.scenario || '')
+            const options = content.options as { label: string; text: string }[] | undefined
+
+            const typeLabel: Record<string, string> = {
+              multiple_choice: 'Multiple Choice',
+              fill_blank: 'Fill in the Blank',
+              error_correction: 'Correct the Error',
+              sentence_creation: 'Create a Sentence',
+              scenario: 'Scenario',
+            }
 
             const userAnswerStr = question.userAnswer != null
               ? typeof question.userAnswer === 'string'
                 ? question.userAnswer
                 : JSON.stringify(question.userAnswer)
               : null
-
-            if (isUnanswered && !isCorrect && !isWrong) {
-              return null
-            }
 
             return (
               <Card
@@ -159,12 +176,22 @@ export default function ResultDetailsPage() {
               >
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">Question {question.order}</CardTitle>
+                    <CardTitle className="flex items-center gap-3 text-lg">
+                      <span>Question {question.order}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {typeLabel[question.type] || question.type}
+                      </Badge>
+                    </CardTitle>
                     {isCorrect && <CheckCircle2 className="text-green-600 h-6 w-6 shrink-0" />}
                     {isWrong && <XCircle className="text-red-600 h-6 w-6 shrink-0" />}
                     {isUnanswered && <HelpCircle className="text-muted-foreground h-6 w-6 shrink-0" />}
                   </div>
-                  <CardDescription className="text-base text-foreground mt-2">
+                  {instruction && (
+                    <CardDescription className="text-sm font-medium text-muted-foreground mt-2">
+                      {instruction}
+                    </CardDescription>
+                  )}
+                  <CardDescription className="text-base text-foreground mt-1">
                     {questionText || `Type: ${question.type}`}
                   </CardDescription>
                   {question.lessonTopic && (
@@ -176,14 +203,13 @@ export default function ResultDetailsPage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     {options && options.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {options.map((opt: string) => {
-                          const letter = opt.charAt(0)
-                          const isSelected = userAnswerStr === letter
+                      <div className="flex flex-col gap-2 mb-2">
+                        {options.map((opt) => {
+                          const isSelected = userAnswerStr === opt.label
                           return (
-                            <span
-                              key={letter}
-                              className={`text-xs px-2 py-1 rounded border ${
+                            <div
+                              key={opt.label}
+                              className={`flex items-center gap-3 px-3 py-2 rounded border text-sm ${
                                 isSelected
                                   ? isCorrect
                                     ? 'bg-green-100 border-green-300 text-green-800'
@@ -191,30 +217,49 @@ export default function ResultDetailsPage() {
                                   : 'bg-muted/30 border-border'
                               }`}
                             >
-                              {opt}
-                            </span>
+                              <span className="font-bold">{opt.label}</span>
+                              <span>{opt.text}</span>
+                            </div>
                           )
                         })}
                       </div>
                     )}
 
-                    {userAnswerStr && (
-                      <div className="p-3 bg-background rounded border text-sm flex items-center justify-between">
-                        <span>
-                          Your answer:{' '}
-                          <strong className={isWrong ? 'text-red-600 line-through' : ''}>
-                            {userAnswerStr}
-                          </strong>
-                        </span>
-                        {isCorrect && (
-                          <Badge variant="outline" className="text-green-600 border-green-200">
-                            Correct
-                          </Badge>
+                    {userAnswerStr ? (
+                      <div className="p-3 bg-background rounded border text-sm">
+                        <div className="flex items-center justify-between">
+                          <span>
+                            Your answer:{' '}
+                            <strong className={isWrong ? 'text-red-600 line-through' : ''}>
+                              {userAnswerStr}
+                            </strong>
+                          </span>
+                          {isCorrect && (
+                            <Badge variant="outline" className="text-green-600 border-green-200">
+                              Correct
+                            </Badge>
+                          )}
+                          {isWrong && (
+                            <Badge variant="outline" className="text-red-600 border-red-200">
+                              Incorrect
+                            </Badge>
+                          )}
+                        </div>
+                        {isWrong && question.correctAnswer && (
+                          <div className="mt-2 pt-2 border-t text-green-700">
+                            Correct answer: <strong>{question.correctAnswer}</strong>
+                          </div>
                         )}
-                        {isWrong && (
-                          <Badge variant="outline" className="text-red-600 border-red-200">
-                            Incorrect
-                          </Badge>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-muted/30 rounded border text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Not answered</span>
+                        </div>
+                        {question.correctAnswer && (
+                          <div className="mt-2 pt-2 border-t text-green-700">
+                            Correct answer: <strong>{question.correctAnswer}</strong>
+                          </div>
                         )}
                       </div>
                     )}

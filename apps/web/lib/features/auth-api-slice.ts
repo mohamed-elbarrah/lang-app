@@ -1,4 +1,5 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { loggingBaseQuery } from '../logging-base-query'
 
 export interface User {
   id: string
@@ -29,9 +30,7 @@ export interface LoginInput {
 
 export const authApi = createApi({
   reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: '/api',
-  }),
+  baseQuery: loggingBaseQuery,
   tagTypes: ['Session'],
   endpoints: (builder) => ({
     register: builder.mutation<User, RegisterInput>({
