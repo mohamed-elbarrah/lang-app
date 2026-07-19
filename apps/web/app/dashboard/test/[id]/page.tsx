@@ -12,11 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, XCircle, ArrowLeft, ArrowRight, Loader2, AlertCircle, Clock } from "lucide-react"
 import { useGetExamQuery, useSubmitAnswerMutation, useCompleteExamMutation } from '@/lib/features/exams-api-slice'
 import type { Question } from '@/lib/features/exams-api-slice'
-
-interface OptionItem {
-  label: string
-  text: string
-}
+import { normalizeOptions } from '@/lib/exam-utils'
+import type { OptionItem } from '@/lib/exam-utils'
 
 function extractContent(content: Record<string, unknown>): {
   instruction: string
@@ -27,7 +24,7 @@ function extractContent(content: Record<string, unknown>): {
   const c = content as Record<string, unknown>
   const instruction = String(c.instruction || '')
   const questionText = String(c.question || c.sentence || c.scenario || '')
-  const options = c.options as OptionItem[] | undefined
+  const options = normalizeOptions(c.options)
   const scenario = c.scenario as string | undefined
   return { instruction, questionText, options, scenario }
 }
@@ -215,6 +212,7 @@ export default function TestPage() {
   const [savedNotif, setSavedNotif] = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const submittingRef = useRef(false)
 
   const questions: Question[] = exam?.questions || []
   const currentQuestion = questions[currentIndex]
@@ -285,7 +283,8 @@ export default function TestPage() {
   }, [currentIndex])
 
   const handleSubmit = useCallback(async () => {
-    if (!currentQuestion || !answer.trim()) return
+    if (submittingRef.current || !currentQuestion || !answer.trim()) return
+    submittingRef.current = true
     setPageError(null)
     try {
       const result = await submitAnswer({
@@ -329,6 +328,8 @@ export default function TestPage() {
       } else {
         setPageError(message)
       }
+    } finally {
+      submittingRef.current = false
     }
   }, [currentQuestion, answer, examId, submitAnswer, isInstantMode, handleNext, refetch])
 

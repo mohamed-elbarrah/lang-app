@@ -1,125 +1,94 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Req,
-  Res,
-  HttpCode,
-  UnauthorizedException,
+  Controller, Post, Get, Body, Req, Res, HttpCode, HttpStatus,
+  ConflictException, UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { auth } from './better-auth';
-import { PrismaService } from '../prisma/prisma.service';
 import { Throttle } from '@nestjs/throttler';
+import { AuthService } from './auth.service';
 import { SignUpDto } from '../common/dto/signup.dto';
 import { SignInDto } from '../common/dto/signin.dto';
+import { AUTH_CONFIG, getCookieOptions } from './auth.config';
 
-const COOKIE_NAME = 'better-auth.session_token';
-
-function getCookieOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
-  return {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'lax' as const,
-    secure: isProduction,
-    maxAge: 604800,
-  };
+function forwardSetCookies(res: Response, headers?: Headers) {
+  if (!headers) return;
+  const cookies = headers.getSetCookie();
+  if (cookies.length) {
+    res.setHeader('Set-Cookie', cookies);
+  }
 }
 
 @Controller()
 export class AuthController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly auth: AuthService) {}
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signup')
-  @HttpCode(200)
-  async signup(
-    @Body() body: SignUpDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const response = await auth.api.signUpEmail({
-      body: {
-        email: body.email,
-        password: body.password,
-        name: body.name || body.email.split('@')[0],
-      },
-    });
+  @HttpCode(HttpStatus.OK)
+  async signup(@Body() body: SignUpDto, @Res({ passthrough: true }) res: Response) {
+    try {
+      const { headers, response } = await this.auth.signUp(body);
 
-    if (response.token) {
-      res.cookie(COOKIE_NAME, response.token, getCookieOptions());
+      forwardSetCookies(res, headers);
+
+      return { user: response.user, token: response.token };
+    } catch (error: any) {
+      if (error?.status === 422 || error?.message?.toLowerCase().includes('already')) {
+        throw new ConflictException('An account with this email already exists');
+      }
+      throw error;
     }
-
-    const fullUser = await this.prisma.user.findUnique({
-      where: { id: response.user.id },
-    });
-
-    return fullUser;
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signin')
-  @HttpCode(200)
-  async signin(
-    @Body() body: SignInDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const response = await auth.api.signInEmail({
-      body: {
-        email: body.email,
-        password: body.password,
-      },
-    });
+  @HttpCode(HttpStatus.OK)
+  async signin(@Body() body: SignInDto, @Res({ passthrough: true }) res: Response) {
+    try {
+      const { headers, response } = await this.auth.signIn(body);
 
-    if (response.token) {
-      res.cookie(COOKIE_NAME, response.token, getCookieOptions());
+      forwardSetCookies(res, headers);
+
+      return { user: response.user, token: response.token };
+    } catch {
+      throw new UnauthorizedException('Invalid email or password');
     }
-
-    const fullUser = await this.prisma.user.findUnique({
-      where: { id: response.user.id },
-    });
-
-    return fullUser;
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signout')
-  @HttpCode(200)
-  async signout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const cookie = req.headers.cookie;
-    const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    if (match) {
-      await this.prisma.session.deleteMany({ where: { token: match[1] } });
+  @HttpCode(HttpStatus.OK)
+  async signout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token =
+      req.cookies?.[AUTH_CONFIG.COOKIE_NAME] ??
+      req.headers.authorization?.replace('Bearer ', '');
+
+    if (token) {
+      try {
+        const { headers } = await this.auth.signOut(token);
+        forwardSetCookies(res, headers);
+        return { success: true };
+      } catch {
+        // Still clear the cookie even if server signOut fails
+        res.cookie(AUTH_CONFIG.COOKIE_NAME, '', getCookieOptions(0));
+        return { success: true };
+      }
     }
 
-    res.cookie(COOKIE_NAME, '', { ...getCookieOptions(), maxAge: 0 });
-
+    res.cookie(AUTH_CONFIG.COOKIE_NAME, '', getCookieOptions(0));
     return { success: true };
   }
 
   @Get('session')
-  async getSession(@Req() req: Request) {
-    const cookie = req.headers.cookie;
-    const match = cookie?.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    if (!match) {
-      return { user: null, session: null };
+  @HttpCode(HttpStatus.OK)
+  async getSession(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    if (req.user && req.session && req.session.expiresAt > new Date()) {
+      return {
+        user: req.user,
+        session: { id: req.session.id, expiresAt: req.session.expiresAt },
+      };
     }
 
-    const session = await this.prisma.session.findUnique({
-      where: { token: match[1] },
-      include: { user: true },
-    });
-
-    if (!session || session.expiresAt <= new Date()) {
-      return { user: null, session: null };
-    }
-
-    return {
-      user: session.user,
-      session: { id: session.id, expiresAt: session.expiresAt },
-    };
+    res.cookie(AUTH_CONFIG.COOKIE_NAME, '', getCookieOptions(0));
+    return { user: null, session: null };
   }
 }

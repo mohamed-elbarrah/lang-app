@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { useRegisterMutation } from '@/lib/features/auth-api-slice'
-import { useAppDispatch } from '@/lib/hooks'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { setUser } from '@/lib/features/auth-slice'
 
 const registerSchema = z.object({
@@ -32,6 +32,13 @@ export default function RegisterPage() {
   const dispatch = useAppDispatch()
   const [registerUser, { isLoading }] = useRegisterMutation()
   const [error, setError] = useState<string | null>(null)
+  const { isAuthenticated, user } = useAppSelector((s) => s.auth)
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(user?.role === 'admin' ? '/admin' : '/dashboard')
+    }
+  }, [isAuthenticated, user?.role, router])
 
   const {
     register,
@@ -44,13 +51,13 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     setError(null)
     try {
-      const user = await registerUser({
+      const result = await registerUser({
         email: data.email,
         password: data.password,
         name: data.name,
       }).unwrap()
-      dispatch(setUser(user))
-      router.push(user?.role === 'admin' ? '/admin' : '/dashboard')
+      dispatch(setUser(result.user))
+      router.push(result.user?.role === 'admin' ? '/admin' : '/dashboard')
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'data' in err

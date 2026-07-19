@@ -13,14 +13,18 @@ import { ExamsModule } from './exams/exams.module';
 import { ResultsModule } from './results/results.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CommonModule } from './common/common.module';
+import { CsrfGuard } from './common/guards/csrf.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 60,
-    }]),
+    ThrottlerModule.forRoot({
+      throttlers: [{
+        ttl: 60000,
+        limit: 60,
+      }],
+      getTracker: (req) => req.ip || 'unknown',
+    }),
     PrismaModule,
     CommonModule,
     AuthModule,
@@ -37,6 +41,10 @@ import { CommonModule } from './common/common.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
   ],
 })

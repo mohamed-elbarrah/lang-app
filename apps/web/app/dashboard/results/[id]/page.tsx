@@ -9,6 +9,8 @@ import { CheckCircle2, XCircle, ArrowLeft, AlertCircle, HelpCircle, RotateCcw } 
 import Link from "next/link"
 import { useGetResultDetailQuery } from '@/lib/features/results-api-slice'
 import { useRetakeExamMutation } from '@/lib/features/exams-api-slice'
+import { normalizeOptions } from '@/lib/exam-utils'
+import type { OptionItem } from '@/lib/exam-utils'
 
 export default function ResultDetailsPage() {
   const params = useParams()
@@ -147,7 +149,7 @@ export default function ResultDetailsPage() {
             const content = question.content || {}
             const instruction = String(content.instruction || '')
             const questionText = String(content.question || content.sentence || content.scenario || '')
-            const options = content.options as { label: string; text: string }[] | undefined
+            const options = normalizeOptions(content.options)
 
             const typeLabel: Record<string, string> = {
               multiple_choice: 'Multiple Choice',

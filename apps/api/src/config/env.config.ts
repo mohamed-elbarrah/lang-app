@@ -4,6 +4,8 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   DATABASE_URL: z.string().url(),
+  BETTER_AUTH_SECRET: z.string().min(16, 'BETTER_AUTH_SECRET must be at least 16 characters'),
+  BETTER_AUTH_URL: z.string().url(),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
 });

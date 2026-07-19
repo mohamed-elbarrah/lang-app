@@ -7,20 +7,24 @@ import { useAppSelector } from "@/lib/hooks";
 import AdminGuard from "@/components/auth/admin-guard";
 import SessionProvider from "@/components/auth/session-provider";
 import { useLogoutMutation } from "@/lib/features/auth-api-slice";
+import { useAppDispatch } from "@/lib/hooks";
+import { clearUser } from "@/lib/features/auth-slice";
 import { useRouter } from "next/navigation";
 
 function AdminSidebar({ children }: { children: React.ReactNode }) {
   const { user } = useAppSelector((s) => s.auth)
+  const dispatch = useAppDispatch()
   const [logout] = useLogoutMutation()
   const router = useRouter()
 
   const handleLogout = async () => {
+    dispatch(clearUser())
     try {
       await logout().unwrap()
-      router.replace('/')
     } catch {
-      router.replace('/')
+      // Server error ignored — already cleared locally
     }
+    router.replace('/')
   }
 
   return (

@@ -2,6 +2,7 @@ import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolk
 import { fetchBaseQuery } from '@reduxjs/toolkit/query'
 
 const baseFetch = fetchBaseQuery({ baseUrl: '/api' })
+const isDev = process.env.NODE_ENV !== 'production'
 
 export const loggingBaseQuery: BaseQueryFn<
   string | FetchArgs,
@@ -12,18 +13,22 @@ export const loggingBaseQuery: BaseQueryFn<
   const method = typeof args === 'string' ? 'GET' : (args.method || 'GET')
   const url = typeof args === 'string' ? args : args.url
 
-  console.log(`[API] ${method} ${url}`)
+  if (isDev) {
+    console.log(`[API] ${method} ${url}`)
+  }
 
   const result = await baseFetch(args, api, extraOptions)
 
   const duration = Date.now() - requestStart
 
   if (result.error) {
-    console.error(`[API] ${method} ${url} FAILED (${result.error.status}) ${duration}ms`, result.error.data)
+    if (isDev) {
+      console.error(`[API] ${method} ${url} FAILED (${result.error.status}) ${duration}ms`, result.error.data)
+    }
     if (result.error.status === 429) {
       window.dispatchEvent(new CustomEvent('throttler-warning'))
     }
-  } else {
+  } else if (isDev) {
     console.log(`[API] ${method} ${url} OK ${duration}ms`)
   }
 

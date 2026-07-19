@@ -14,6 +14,7 @@ function proxyRequest(req, res) {
   const parsed = new URL(req.url, apiTarget)
   const proxyHeaders = { ...req.headers }
   delete proxyHeaders.connection
+  proxyHeaders['x-forwarded-for'] = req.socket.remoteAddress
 
   const proxyReq = http.request(
     parsed,

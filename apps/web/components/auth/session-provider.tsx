@@ -11,20 +11,20 @@ export default function SessionProvider({
   children: React.ReactNode
 }) {
   const dispatch = useAppDispatch()
-  const { user } = useAppSelector((s) => s.auth)
+  const { user, isAuthenticated } = useAppSelector((s) => s.auth)
   const { data, isLoading } = useGetSessionQuery(undefined, {
     skip: !!user,
   })
 
   useEffect(() => {
-    if (!isLoading) {
-      if (data?.user) {
-        dispatch(setUser(data.user))
-      } else if (!user) {
-        dispatch(clearUser())
-      }
+    if (isLoading) return
+
+    if (data?.user) {
+      dispatch(setUser(data.user))
+    } else if (!user && !isAuthenticated) {
+      dispatch(clearUser())
     }
-  }, [data, isLoading, dispatch, user])
+  }, [data, isLoading, dispatch, user, isAuthenticated])
 
   if (isLoading && !user) {
     return (

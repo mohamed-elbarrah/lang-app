@@ -1,15 +1,18 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAppSelector } from '@/lib/hooks'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { isAuthenticated, isLoading } = useAppSelector((s) => s.auth)
+  const hasRedirected = useRef(false)
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading || hasRedirected.current) return
+    if (!isAuthenticated) {
+      hasRedirected.current = true
       router.replace('/login')
     }
   }, [isLoading, isAuthenticated, router])

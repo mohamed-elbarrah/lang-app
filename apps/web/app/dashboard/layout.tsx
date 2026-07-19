@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, LayoutDashboard, FileText, History, User as UserIcon, LogOut, AlertTriangle, X } from "lucide-react";
 import Link from "next/link";
 import { useAppSelector } from "@/lib/hooks";
+import { useAppDispatch } from "@/lib/hooks";
 import { useLogoutMutation } from "@/lib/features/auth-api-slice";
+import { clearUser } from "@/lib/features/auth-slice";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/auth/auth-guard";
 import SessionProvider from "@/components/auth/session-provider";
 
 function DashboardSidebar({ children }: { children: React.ReactNode }) {
   const { user } = useAppSelector((s) => s.auth)
+  const dispatch = useAppDispatch()
   const [logout] = useLogoutMutation()
   const router = useRouter()
   const [throttled, setThrottled] = useState(false)
@@ -23,12 +26,13 @@ function DashboardSidebar({ children }: { children: React.ReactNode }) {
   }, [])
 
   const handleLogout = async () => {
+    dispatch(clearUser())
     try {
       await logout().unwrap()
-      router.replace('/')
     } catch {
-      router.replace('/')
+      // Server error ignored — already cleared locally
     }
+    router.replace('/')
   }
 
   return (

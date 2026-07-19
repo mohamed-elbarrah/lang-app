@@ -12,7 +12,12 @@ export interface User {
   updatedAt: string
 }
 
-export interface Session {
+export interface AuthResponse {
+  user: User
+  token: string
+}
+
+export interface SessionResponse {
   user: User | null
   session: { id: string; expiresAt: string } | null
 }
@@ -33,7 +38,7 @@ export const authApi = createApi({
   baseQuery: loggingBaseQuery,
   tagTypes: ['Session'],
   endpoints: (builder) => ({
-    register: builder.mutation<User, RegisterInput>({
+    register: builder.mutation<AuthResponse, RegisterInput>({
       query: (body) => ({
         url: '/signup',
         method: 'POST',
@@ -41,7 +46,7 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['Session'],
     }),
-    login: builder.mutation<User, LoginInput>({
+    login: builder.mutation<AuthResponse, LoginInput>({
       query: (body) => ({
         url: '/signin',
         method: 'POST',
@@ -56,7 +61,7 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['Session'],
     }),
-    getSession: builder.query<Session, void>({
+    getSession: builder.query<SessionResponse, void>({
       query: () => '/session',
       providesTags: ['Session'],
     }),
