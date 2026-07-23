@@ -151,6 +151,7 @@ model Question {
   userAnswer    Json?
   correctAnswer String?
   isCorrect     Boolean?
+  score         Int?
   explanation   String?
   order         Int
   lessonTopic   String?

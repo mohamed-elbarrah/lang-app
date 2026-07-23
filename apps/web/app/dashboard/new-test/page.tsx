@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, AlertCircle, Clock, Search, Check } from "lucide-react"
+import { Loader2, AlertCircle, Clock, Search, Check, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { useCreateExamMutation } from '@/lib/features/exams-api-slice'
 
@@ -156,6 +156,9 @@ export default function NewTestPage() {
   const [allLessons, setAllLessons] = useState<Lesson[]>([])
   const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
+  const [progressStep, setProgressStep] = useState<'analyzing' | 'generating' | 'building'>('analyzing')
+  const [elapsed, setElapsed] = useState(0)
+  const startTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     fetch('/api/lessons')
@@ -176,6 +179,23 @@ export default function NewTestPage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (!generating) return
+    setProgressStep('analyzing')
+    startTimeRef.current = Date.now()
+
+    const t1 = setTimeout(() => setProgressStep('generating'), 1500)
+    return () => { clearTimeout(t1) }
+  }, [generating])
+
+  useEffect(() => {
+    if (!generating) { setElapsed(0); return }
+    const interval = setInterval(() => {
+      setElapsed(startTimeRef.current ? Math.floor((Date.now() - startTimeRef.current) / 1000) : 0)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [generating])
+
   const handleSubmit = async () => {
     if (selectedLessonIds.length === 0) {
       setError('Please select at least one lesson.')
@@ -184,6 +204,9 @@ export default function NewTestPage() {
 
     setError(null)
     setGenerating(true)
+    setProgressStep('analyzing')
+    setElapsed(0)
+    startTimeRef.current = Date.now()
     try {
       const exam = await createExam({
         level: level as 'beginner' | 'intermediate' | 'advanced',
@@ -191,6 +214,8 @@ export default function NewTestPage() {
         questionCount: parseInt(questionCount, 10),
         correctionMode: correctionMode as 'instant' | 'final',
       }).unwrap()
+      setProgressStep('building')
+      await new Promise((r) => setTimeout(r, 600))
       router.push(`/dashboard/test/${exam.id}`)
     } catch (err: unknown) {
       setGenerating(false)
@@ -211,14 +236,46 @@ export default function NewTestPage() {
   }
 
   if (generating) {
+    const steps = [
+      { key: 'analyzing', label: 'Analyzing lessons...' },
+      { key: 'generating', label: 'Generating questions with AI...' },
+      { key: 'building', label: 'Building your exam...' },
+    ] as const
+
     return (
-      <div className="max-w-2xl mx-auto space-y-6 text-center py-12">
+      <div className="max-w-2xl mx-auto space-y-8 text-center py-12">
         <Clock className="h-16 w-16 text-primary mx-auto animate-pulse" />
         <h1 className="text-3xl font-bold">Generating Your Exam</h1>
-        <p className="text-muted-foreground">
-          Please wait while we prepare your questions using AI. This may take a few seconds...
-        </p>
-        <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+        <div className="space-y-4 max-w-sm mx-auto text-left">
+          {steps.map((s) => {
+            const isActive = progressStep === s.key
+            const isDone =
+              (s.key === 'analyzing' && progressStep !== 'analyzing') ||
+              (s.key === 'generating' && progressStep === 'building')
+            return (
+              <div key={s.key} className="flex items-center gap-3">
+                {isDone ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                ) : isActive ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
+                ) : (
+                  <div className="h-5 w-5 shrink-0" />
+                )}
+                <span className={
+                  isActive ? 'font-medium' : isDone ? 'text-muted-foreground' : 'text-muted-foreground/40'
+                }>
+                  {s.label}
+                </span>
+                {isActive && <span className="text-xs text-muted-foreground ml-auto">{elapsed}s</span>}
+              </div>
+            )
+          })}
+        </div>
+        {progressStep === 'generating' && elapsed > 15 && (
+          <p className="text-sm text-muted-foreground">
+            This is taking longer than expected. AI generation can sometimes be slow.
+          </p>
+        )}
         <Button variant="outline" onClick={() => { setGenerating(false); router.push('/dashboard') }}>
           Cancel
         </Button>

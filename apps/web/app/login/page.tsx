@@ -27,6 +27,9 @@ export default function LoginPage() {
   const dispatch = useAppDispatch()
   const [login, { isLoading }] = useLoginMutation()
   const [error, setError] = useState<string | null>(null)
+  const [expired] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('expired') === '1',
+  )
   const { isAuthenticated, user } = useAppSelector((s) => s.auth)
 
   useEffect(() => {
@@ -48,7 +51,17 @@ export default function LoginPage() {
     try {
       const result = await login(data).unwrap()
       dispatch(setUser(result.user))
-      router.push(result.user?.role === 'admin' ? '/admin' : '/dashboard')
+
+      const redirect = typeof window !== 'undefined'
+        ? sessionStorage.getItem('redirect-after-login')
+        : null
+      sessionStorage.removeItem('redirect-after-login')
+
+      if (redirect) {
+        router.push(redirect)
+      } else {
+        router.push(result.user?.role === 'admin' ? '/admin' : '/dashboard')
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'data' in err
@@ -74,6 +87,11 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
+            {expired && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+                Your session has expired. Please log in again.
+              </div>
+            )}
             {error && (
               <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {error}

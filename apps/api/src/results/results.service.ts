@@ -73,6 +73,11 @@ export class ResultsService {
       (q) => q.isCorrect === null,
     ).length;
 
+    const totalScore = exam.questions.reduce((sum, q) => {
+      if (q.score != null) return sum + q.score;
+      return sum + (q.isCorrect === true ? 100 : 0);
+    }, 0);
+
     const topicsToReview = exam.questions
       .filter((q) => q.isCorrect === false && q.lessonTopic)
       .map((q) => q.lessonTopic as string)
@@ -88,6 +93,7 @@ export class ResultsService {
         incorrectCount,
         unansweredCount,
         totalQuestions: exam.questions.length,
+        totalScore: exam.questions.length > 0 ? Math.round(totalScore / exam.questions.length) : 0,
         topicsToReview,
       },
     };

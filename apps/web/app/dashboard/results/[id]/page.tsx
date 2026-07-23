@@ -188,6 +188,17 @@ export default function ResultDetailsPage() {
                         {typeLabel[question.type] || question.type}
                       </Badge>
                     </CardTitle>
+                    {question.score != null && (
+                      <Badge variant="outline" className={
+                        question.score >= 80
+                          ? 'text-green-600 border-green-200'
+                          : question.score >= 40
+                            ? 'text-yellow-600 border-yellow-200'
+                            : 'text-red-600 border-red-200'
+                      }>
+                        {question.score}%
+                      </Badge>
+                    )}
                     {isCorrect && <CheckCircle2 className="text-green-600 h-6 w-6 shrink-0" />}
                     {isWrong && <XCircle className="text-red-600 h-6 w-6 shrink-0" />}
                     {isUnanswered && <HelpCircle className="text-muted-foreground h-6 w-6 shrink-0" />}

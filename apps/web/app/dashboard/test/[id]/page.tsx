@@ -17,7 +17,7 @@ import type { OptionItem } from '@/lib/exam-utils'
 
 type QuestionPhase =
   | { status: 'unanswered' }
-  | { status: 'answered'; isCorrect: boolean; explanation: string | null }
+  | { status: 'answered'; isCorrect: boolean; score?: number; explanation: string | null }
   | { status: 'acknowledged' }
 
 function extractContent(content: Record<string, unknown>): {
@@ -299,6 +299,7 @@ export default function TestPage() {
         setQuestionPhase({
           status: 'answered',
           isCorrect: result.isCorrect,
+          score: result.score,
           explanation: result.explanation,
         })
       } else {
@@ -468,23 +469,37 @@ export default function TestPage() {
             <ScenarioQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={isAnswered} />
           )}
 
-          {showFeedback && (
-            <div className={`mt-6 p-4 rounded-lg border ${questionPhase.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                {questionPhase.isCorrect ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-600" />
+          {showFeedback && (() => {
+            const displayScore = questionPhase.score ?? (questionPhase.isCorrect ? 100 : 0)
+            const level = displayScore >= 80 ? 'high' : displayScore >= 40 ? 'mid' : 'low'
+            const colors = {
+              high: 'bg-green-50 border-green-200 text-green-700',
+              mid: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+              low: 'bg-red-50 border-red-200 text-red-700',
+            }
+            const icons = {
+              high: <CheckCircle2 className="h-5 w-5 text-green-600" />,
+              mid: <AlertCircle className="h-5 w-5 text-yellow-600" />,
+              low: <XCircle className="h-5 w-5 text-red-600" />,
+            }
+            return (
+              <div className={`mt-6 p-4 rounded-lg border ${colors[level]}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {icons[level]}
+                  <span className={`font-semibold ${colors[level]}`}>
+                    {questionPhase.score != null
+                      ? `${questionPhase.score}% correct`
+                      : questionPhase.isCorrect
+                        ? 'Correct!'
+                        : 'Incorrect'}
+                  </span>
+                </div>
+                {questionPhase.explanation && (
+                  <p className="text-sm text-muted-foreground mt-1">{questionPhase.explanation}</p>
                 )}
-                <span className={`font-semibold ${questionPhase.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                  {questionPhase.isCorrect ? 'Correct!' : 'Incorrect'}
-                </span>
               </div>
-              {questionPhase.explanation && (
-                <p className="text-sm text-muted-foreground mt-1">{questionPhase.explanation}</p>
-              )}
-            </div>
-          )}
+            )
+          })()}
         </CardContent>
         <CardFooter className="flex justify-between border-t p-6">
           <Button variant="outline" onClick={handlePrev} disabled={currentIndex === 0}>

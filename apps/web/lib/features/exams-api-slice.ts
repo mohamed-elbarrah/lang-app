@@ -8,6 +8,7 @@ export interface Question {
   content: Record<string, unknown>
   userAnswer: unknown
   isCorrect: boolean | null
+  score: number | null
   explanation: string | null
   order: number
   lessonTopic: string | null
@@ -50,6 +51,7 @@ export interface PaginatedExams {
 export interface SubmitAnswerResult {
   completed: boolean
   isCorrect: boolean
+  score?: number
   explanation: string | null
   nextQuestion?: Question
   progress: {

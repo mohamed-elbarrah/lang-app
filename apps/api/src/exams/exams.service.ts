@@ -133,11 +133,34 @@ export class ExamsService {
     level: string,
   ) {
     const formattedLessons = this.formatLessonsForPrompt(selectedLessons);
-    const aiResponse = await this.aiService.generateQuestions({
-      lessons: formattedLessons,
-      count: questionCount,
-      level,
-    });
+
+    const MAX_RETRIES = 1;
+    let aiResponse: Awaited<ReturnType<AiService['generateQuestions']>> | null = null;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        aiResponse = await this.aiService.generateQuestions({
+          lessons: formattedLessons,
+          count: questionCount,
+          level,
+        });
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < MAX_RETRIES) {
+          this.logger.warn(
+            `AI generation attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for exam ${examId}: ${error instanceof Error ? error.message : 'Unknown error'}. Retrying...`,
+          );
+          continue;
+        }
+      }
+    }
+
+    if (!aiResponse) {
+      throw lastError;
+    }
+
     const aiQuestions = aiResponse.questions;
 
     const questions = aiQuestions.map((q, i) => {
@@ -318,7 +341,7 @@ export class ExamsService {
       throw new BadRequestException('Exam is still being generated. Please try again shortly.');
     }
 
-    let { isCorrect, explanation } = await this.evaluateAnswer(examId, dto);
+    let { isCorrect, explanation, score } = await this.evaluateAnswer(examId, dto);
 
     const updated = await this.prisma.question.updateMany({
       where: {
@@ -330,6 +353,7 @@ export class ExamsService {
         userAnswer: dto.answer as Prisma.InputJsonValue,
         isCorrect,
         explanation,
+        score,
       },
     });
 
@@ -362,6 +386,7 @@ export class ExamsService {
       return {
         completed: true,
         isCorrect,
+        score,
         explanation,
         progress: { answered: totalCount, total: totalCount },
       };
@@ -381,6 +406,7 @@ export class ExamsService {
       return {
         completed: true,
         isCorrect,
+        score,
         explanation,
         progress: { answered: totalCount, total: totalCount },
       };
@@ -391,6 +417,7 @@ export class ExamsService {
     return {
       completed: false,
       isCorrect,
+      score,
       explanation,
       nextQuestion: safeQuestion,
       progress: {
@@ -449,8 +476,11 @@ export class ExamsService {
       orderBy: { order: 'asc' },
     });
 
-    const correctCount = allQuestions.filter((q) => q.isCorrect === true).length;
-    const score = Math.round((correctCount / allQuestions.length) * 100);
+    const totalScore = allQuestions.reduce((sum, q) => {
+      if (q.score != null) return sum + q.score;
+      return sum + (q.isCorrect === true ? 100 : 0);
+    }, 0);
+    const score = Math.round(totalScore / allQuestions.length);
 
     const completedExam = await this.prisma.exam.update({
       where: { id: examId },
@@ -505,7 +535,7 @@ export class ExamsService {
   private async evaluateAnswer(
     examId: string,
     dto: SubmitAnswerDto,
-  ): Promise<{ isCorrect: boolean; explanation: string | null }> {
+  ): Promise<{ isCorrect: boolean; explanation: string | null; score: number }> {
     const question = await this.prisma.question.findUnique({
       where: { id: dto.questionId },
     });
@@ -518,7 +548,7 @@ export class ExamsService {
     const correctAnswer = answerKey?.correctAnswer || question.correctAnswer;
 
     if (!correctAnswer) {
-      return { isCorrect: false, explanation: null };
+      return { isCorrect: false, explanation: null, score: 0 };
     }
 
     const type = question.type as QuestionType;
@@ -528,6 +558,7 @@ export class ExamsService {
       return {
         isCorrect,
         explanation: isCorrect ? null : question.explanation || null,
+        score: isCorrect ? 100 : 0,
       };
     }
 
@@ -571,7 +602,7 @@ export class ExamsService {
     question: any,
     userAnswer: unknown,
     correctAnswer: string,
-  ): Promise<{ isCorrect: boolean; explanation: string | null }> {
+  ): Promise<{ isCorrect: boolean; explanation: string | null; score: number }> {
     const fingerprint = this.createEvaluationFingerprint(question.id, userAnswer);
 
     const cached = await this.prisma.answerEvaluation.findUnique({
@@ -582,6 +613,7 @@ export class ExamsService {
       return {
         isCorrect: cached.isCorrect,
         explanation: cached.explanation || null,
+        score: cached.score ?? (cached.isCorrect ? 100 : 0),
       };
     }
 
@@ -597,32 +629,32 @@ export class ExamsService {
         evaluation = JSON.parse(evaluationResponse);
       } catch {
         this.logger.warn(`AI evaluation returned invalid JSON: ${evaluationResponse}`);
-        return { isCorrect: false, explanation: null };
+        return { isCorrect: false, explanation: null, score: 0 };
       }
 
       const isCorrect = Boolean(evaluation.isCorrect);
       const explanation = String(evaluation.explanation || evaluation.feedback || '');
-
-      const result = { isCorrect, explanation: explanation || null };
+      const rawScore = typeof evaluation.score === 'number' ? evaluation.score : (isCorrect ? 100 : 0);
+      const score = Math.round(Math.max(0, Math.min(100, rawScore)));
 
       await this.prisma.answerEvaluation
         .create({
           data: {
             fingerprint,
-            isCorrect: result.isCorrect,
-            score: typeof evaluation.score === 'number' ? evaluation.score : null,
+            isCorrect,
+            score,
             feedback: String(evaluation.feedback ?? '') || null,
-            explanation: result.explanation,
+            explanation: explanation || null,
           },
         })
         .catch(() => {
           // Ignore duplicate fingerprint errors (race conditions)
         });
 
-      return result;
+      return { isCorrect, explanation: explanation || null, score };
     } catch (error) {
       this.logger.warn(`AI evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return { isCorrect: false, explanation: null };
+      return { isCorrect: false, explanation: null, score: 0 };
     }
   }
 

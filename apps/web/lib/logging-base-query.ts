@@ -25,7 +25,12 @@ export const loggingBaseQuery: BaseQueryFn<
     if (isDev) {
       console.error(`[API] ${method} ${url} FAILED (${result.error.status}) ${duration}ms`, result.error.data)
     }
-    if (result.error.status === 429) {
+    if (result.error.status === 401) {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        sessionStorage.setItem('redirect-after-login', window.location.pathname)
+        window.location.href = '/login?expired=1'
+      }
+    } else if (result.error.status === 429) {
       window.dispatchEvent(new CustomEvent('throttler-warning'))
     }
   } else if (isDev) {
