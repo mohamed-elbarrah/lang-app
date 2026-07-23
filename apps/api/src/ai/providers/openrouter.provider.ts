@@ -43,7 +43,16 @@ export class OpenRouterProvider implements AiProvider {
 
   async generateQuestions(params: GenerateQuestionsParams): Promise<string> {
     const randomSeed = Date.now();
+
+    const levelInstructions: Record<string, string> = {
+      beginner: 'Beginner level: Test basic understanding. Use simple vocabulary, clear contexts, and one-step grammar rules. Multiple choice options should have one clearly correct answer with obviously wrong distractors.',
+      intermediate: 'Intermediate level: Test practical application. Use moderate vocabulary, real-world contexts, and multi-step grammar rules. Include some nuance in distractors.',
+      advanced: 'Advanced level: Test mastery. Use complex vocabulary, subtle contexts, and edge cases. Include exceptions, formal/informal distinctions, and advanced structures.',
+    };
+
     const prompt = `You are an English grammar test generator. Generate ${params.count} questions based on the following lesson content.
+
+${levelInstructions[params.level] || levelInstructions.beginner}
 
 Lesson content:
 ${params.lessons}

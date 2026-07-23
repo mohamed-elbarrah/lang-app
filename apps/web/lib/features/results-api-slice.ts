@@ -17,6 +17,7 @@ export interface ExamResult {
   id: string
   userId: string
   questionCount: number
+  level: 'beginner' | 'intermediate' | 'advanced'
   correctionMode: string
   score: number | null
   status: string
@@ -35,6 +36,7 @@ export interface ExamResult {
 export interface ResultListItem {
   id: string
   questionCount: number
+  level: 'beginner' | 'intermediate' | 'advanced'
   correctionMode: string
   score: number | null
   createdAt: string

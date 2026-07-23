@@ -9,11 +9,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, XCircle, ArrowLeft, ArrowRight, Loader2, AlertCircle, Clock } from "lucide-react"
+import { CheckCircle2, XCircle, ArrowLeft, ArrowRight, Loader2, AlertCircle, Clock, Eye } from "lucide-react"
 import { useGetExamQuery, useSubmitAnswerMutation, useCompleteExamMutation } from '@/lib/features/exams-api-slice'
 import type { Question } from '@/lib/features/exams-api-slice'
 import { normalizeOptions } from '@/lib/exam-utils'
 import type { OptionItem } from '@/lib/exam-utils'
+
+type QuestionPhase =
+  | { status: 'unanswered' }
+  | { status: 'answered'; isCorrect: boolean; explanation: string | null }
+  | { status: 'acknowledged' }
 
 function extractContent(content: Record<string, unknown>): {
   instruction: string
@@ -202,14 +207,9 @@ export default function TestPage() {
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answer, setAnswer] = useState('')
-  const [submitted, setSubmitted] = useState(false)
-  const [lastResult, setLastResult] = useState<{
-    isCorrect: boolean
-    explanation: string | null
-  } | null>(null)
+  const [questionPhase, setQuestionPhase] = useState<QuestionPhase>({ status: 'unanswered' })
   const [pageError, setPageError] = useState<string | null>(null)
   const [completed, setCompleted] = useState(false)
-  const [savedNotif, setSavedNotif] = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const submittingRef = useRef(false)
@@ -222,23 +222,20 @@ export default function TestPage() {
   const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0
 
   useEffect(() => {
+    setAnswer('')
+    setQuestionPhase({ status: 'unanswered' })
+    setPageError(null)
+
     if (currentQuestion?.userAnswer != null) {
       const existingAnswer = typeof currentQuestion.userAnswer === 'string'
         ? currentQuestion.userAnswer
         : JSON.stringify(currentQuestion.userAnswer)
       setAnswer(existingAnswer)
-      setSubmitted(true)
-      setLastResult({
-        isCorrect: currentQuestion.isCorrect ?? false,
-        explanation: currentQuestion.explanation,
+      setQuestionPhase({
+        status: 'acknowledged',
       })
-    } else {
-      setAnswer('')
-      setSubmitted(false)
-      setLastResult(null)
     }
-    setPageError(null)
-    setSavedNotif(false)
+
     return () => {
       if (advanceTimerRef.current) {
         clearTimeout(advanceTimerRef.current)
@@ -293,35 +290,29 @@ export default function TestPage() {
         answer,
       }).unwrap()
 
-      setSubmitted(true)
-
       if (result.completed) {
         setCompleted(true)
         return
       }
 
       if (isInstantMode) {
-        setLastResult({
+        setQuestionPhase({
+          status: 'answered',
           isCorrect: result.isCorrect,
           explanation: result.explanation,
         })
       } else {
-        setSavedNotif(true)
+        setQuestionPhase({ status: 'acknowledged' })
         advanceTimerRef.current = setTimeout(() => {
-          setSavedNotif(false)
           handleNext()
         }, 1000)
       }
     } catch (err) {
       const message = getErrorMessage(err)
       if (message === 'Question already answered') {
-        setSubmitted(true)
-        if (isInstantMode) {
-          refetch()
-        } else {
-          setSavedNotif(true)
+        refetch()
+        if (!isInstantMode) {
           advanceTimerRef.current = setTimeout(() => {
-            setSavedNotif(false)
             handleNext()
           }, 1000)
         }
@@ -332,6 +323,10 @@ export default function TestPage() {
       submittingRef.current = false
     }
   }, [currentQuestion, answer, examId, submitAnswer, isInstantMode, handleNext, refetch])
+
+  const handleAcknowledgeCorrection = useCallback(() => {
+    setQuestionPhase({ status: 'acknowledged' })
+  }, [])
 
   const handleComplete = useCallback(async () => {
     setPageError(null)
@@ -412,14 +407,23 @@ export default function TestPage() {
   }
 
   const isLast = currentIndex === questions.length - 1
-  const canSubmit = answer.trim().length > 0 && !submitted && !submitting
+  const canSubmit = answer.trim().length > 0 && questionPhase.status === 'unanswered' && !submitting
+  const isAnswered = questionPhase.status !== 'unanswered'
+  const showFeedback = questionPhase.status === 'answered'
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Grammar Test</h1>
-        <div className="text-sm font-medium bg-muted px-3 py-1 rounded-full">
-          Question {currentIndex + 1} of {questions.length}
+        <div className="flex items-center gap-3">
+          {exam.level && (
+            <Badge variant="outline" className="capitalize text-xs">
+              {exam.level}
+            </Badge>
+          )}
+          <div className="text-sm font-medium bg-muted px-3 py-1 rounded-full">
+            Question {currentIndex + 1} of {questions.length}
+          </div>
         </div>
       </div>
 
@@ -431,13 +435,6 @@ export default function TestPage() {
         <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 px-4 py-3 rounded-md">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {pageError}
-        </div>
-      )}
-
-      {savedNotif && (
-        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 px-4 py-3 rounded-md">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          Answer recorded! Moving to next question...
         </div>
       )}
 
@@ -456,35 +453,35 @@ export default function TestPage() {
         </CardHeader>
         <CardContent>
           {currentQuestion.type === 'multiple_choice' && (
-            <MultipleChoiceQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={submitted} />
+            <MultipleChoiceQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={isAnswered} />
           )}
           {currentQuestion.type === 'fill_blank' && (
-            <FillBlankQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={submitted} />
+            <FillBlankQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={isAnswered} />
           )}
           {currentQuestion.type === 'error_correction' && (
-            <ErrorCorrectionQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={submitted} />
+            <ErrorCorrectionQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={isAnswered} />
           )}
           {currentQuestion.type === 'sentence_creation' && (
-            <SentenceCreationQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={submitted} />
+            <SentenceCreationQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={isAnswered} />
           )}
           {currentQuestion.type === 'scenario' && (
-            <ScenarioQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={submitted} />
+            <ScenarioQuestion content={currentQuestion.content} value={answer} onChange={setAnswer} disabled={isAnswered} />
           )}
 
-          {lastResult && submitted && (
-            <div className={`mt-6 p-4 rounded-lg border ${lastResult.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+          {showFeedback && (
+            <div className={`mt-6 p-4 rounded-lg border ${questionPhase.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
               <div className="flex items-center gap-2 mb-2">
-                {lastResult.isCorrect ? (
+                {questionPhase.isCorrect ? (
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                 ) : (
                   <XCircle className="h-5 w-5 text-red-600" />
                 )}
-                <span className={`font-semibold ${lastResult.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                  {lastResult.isCorrect ? 'Correct!' : 'Incorrect'}
+                <span className={`font-semibold ${questionPhase.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                  {questionPhase.isCorrect ? 'Correct!' : 'Incorrect'}
                 </span>
               </div>
-              {lastResult.explanation && (
-                <p className="text-sm text-muted-foreground mt-1">{lastResult.explanation}</p>
+              {questionPhase.explanation && (
+                <p className="text-sm text-muted-foreground mt-1">{questionPhase.explanation}</p>
               )}
             </div>
           )}
@@ -494,27 +491,39 @@ export default function TestPage() {
             <ArrowLeft className="h-4 w-4 mr-1" /> Previous
           </Button>
 
-          {!submitted ? (
-            <Button onClick={handleSubmit} disabled={!canSubmit}>
-              {submitting ? (
-                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Submitting...</>
-              ) : (
-                'Submit'
-              )}
-            </Button>
-          ) : isLast ? (
-            <Button onClick={handleComplete} disabled={completing}>
-              {completing ? (
-                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Completing...</>
-              ) : (
-                'Complete Exam'
-              )}
-            </Button>
-          ) : (
-            <Button onClick={handleNext}>
-              Next <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {questionPhase.status === 'unanswered' && (
+              <Button onClick={handleSubmit} disabled={!canSubmit}>
+                {submitting ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Submitting...</>
+                ) : (
+                  'Submit'
+                )}
+              </Button>
+            )}
+
+            {showFeedback && isInstantMode && (
+              <Button onClick={handleAcknowledgeCorrection} variant="secondary">
+                <Eye className="h-4 w-4 mr-1" /> Got it
+              </Button>
+            )}
+
+            {questionPhase.status === 'acknowledged' && !isLast && (
+              <Button onClick={handleNext}>
+                Next <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+
+            {questionPhase.status === 'acknowledged' && isLast && (
+              <Button onClick={handleComplete} disabled={completing}>
+                {completing ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Completing...</>
+                ) : (
+                  'View Results'
+                )}
+              </Button>
+            )}
+          </div>
         </CardFooter>
       </Card>
     </div>

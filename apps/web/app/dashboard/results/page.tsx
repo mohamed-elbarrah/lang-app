@@ -82,6 +82,7 @@ export default function ResultsPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Score</TableHead>
+                    <TableHead>Level</TableHead>
                     <TableHead>Mode</TableHead>
                     <TableHead>Questions</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -100,6 +101,11 @@ export default function ResultsPage() {
                           variant={result.score != null && result.score >= 80 ? 'default' : result.score != null && result.score >= 60 ? 'secondary' : 'destructive'}
                         >
                           {result.score != null ? `${result.score}%` : '—'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        <Badge variant="outline" className="text-xs font-normal capitalize">
+                          {result.level}
                         </Badge>
                       </TableCell>
                       <TableCell className="capitalize">{result.correctionMode}</TableCell>

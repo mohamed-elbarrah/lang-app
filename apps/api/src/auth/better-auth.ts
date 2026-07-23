@@ -11,6 +11,17 @@ export function createAuth(prisma: PrismaClient) {
     emailAndPassword: {
       enabled: true,
     },
+    user: {
+      additionalFields: {
+        role: {
+          type: 'string',
+          required: true,
+          defaultValue: 'user',
+          input: false,
+          returned: true,
+        },
+      },
+    },
     session: {
       expiresIn: AUTH_CONFIG.SESSION_EXPIRES_IN,
       updateAge: AUTH_CONFIG.SESSION_UPDATE_AGE,

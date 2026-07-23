@@ -118,6 +118,10 @@ export default function ResultDetailsPage() {
               <p className="font-medium text-lg text-red-600">{summary.incorrectCount ?? 0}</p>
             </div>
             <div className="space-y-1">
+              <span className="text-sm text-muted-foreground">Level</span>
+              <p className="font-medium text-lg capitalize">{result.level}</p>
+            </div>
+            <div className="space-y-1">
               <span className="text-sm text-muted-foreground">Mode</span>
               <p className="font-medium text-lg capitalize">{result.correctionMode}</p>
             </div>

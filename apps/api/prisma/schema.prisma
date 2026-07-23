@@ -23,6 +23,12 @@ enum CorrectionMode {
   final
 }
 
+enum DifficultyLevel {
+  beginner
+  intermediate
+  advanced
+}
+
 enum QuestionType {
   multiple_choice
   fill_blank
@@ -121,6 +127,7 @@ model Exam {
   userId         String
   user           user           @relation(fields: [userId], references: [id], onDelete: Cascade)
   questionCount  Int
+  level          DifficultyLevel @default(beginner)
   contentHash    String?
   correctionMode CorrectionMode @default(final)
   status         ExamStatus     @default(in_progress)

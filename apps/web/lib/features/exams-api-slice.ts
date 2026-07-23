@@ -17,6 +17,7 @@ export interface Exam {
   id: string
   userId: string
   questionCount: number
+  level: 'beginner' | 'intermediate' | 'advanced'
   correctionMode: 'instant' | 'final'
   status: 'generating' | 'in_progress' | 'completed'
   score: number | null
@@ -28,6 +29,7 @@ export interface Exam {
 export interface ExamListItem {
   id: string
   questionCount: number
+  level: 'beginner' | 'intermediate' | 'advanced'
   correctionMode: string
   status: string
   score: number | null
@@ -57,8 +59,9 @@ export interface SubmitAnswerResult {
 }
 
 export interface CreateExamInput {
+  level: 'beginner' | 'intermediate' | 'advanced'
+  lessonIds: string[]
   questionCount?: number
-  partIds?: string[]
   correctionMode?: 'instant' | 'final'
 }
 

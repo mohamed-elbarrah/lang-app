@@ -22,6 +22,7 @@ export class ResultsService {
         select: {
           id: true,
           questionCount: true,
+          level: true,
           correctionMode: true,
           score: true,
           createdAt: true,

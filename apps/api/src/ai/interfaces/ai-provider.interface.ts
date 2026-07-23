@@ -1,6 +1,7 @@
 export interface GenerateQuestionsParams {
   lessons: string;
   count: number;
+  level: string;
 }
 
 export interface EvaluateAnswerParams {

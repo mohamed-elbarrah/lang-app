@@ -5,8 +5,9 @@ import { Prisma, QuestionType } from '@prisma/client';
 import { createHash } from 'crypto';
 
 interface CreateExamDto {
+  level: 'beginner' | 'intermediate' | 'advanced';
+  lessonIds: string[];
   questionCount?: number;
-  partIds?: string[];
   correctionMode?: 'instant' | 'final';
 }
 
@@ -27,44 +28,42 @@ export class ExamsService {
   async create(userId: string, dto: CreateExamDto) {
     const questionCount = dto.questionCount ?? 10;
     const correctionMode = dto.correctionMode ?? 'final';
+    const level = dto.level;
 
     if (questionCount < 3 || questionCount > 50) {
       throw new BadRequestException('questionCount must be between 3 and 50');
     }
 
-    const where = dto.partIds && dto.partIds.length > 0
-      ? { partId: { in: dto.partIds } }
-      : {};
+    if (!dto.lessonIds || dto.lessonIds.length === 0) {
+      throw new BadRequestException('At least one lesson must be selected');
+    }
 
     const lessons = await this.prisma.lesson.findMany({
-      where,
+      where: { id: { in: dto.lessonIds } },
       include: { part: true },
       orderBy: { order: 'asc' },
     });
 
     if (lessons.length === 0) {
-      throw new BadRequestException(
-        dto.partIds && dto.partIds.length > 0
-          ? 'No lessons found for the selected parts'
-          : 'No lessons available',
-      );
+      throw new BadRequestException('No valid lessons found for the selected IDs');
     }
 
     const selectedLessons = this.selectLessons(lessons, questionCount);
 
-    this.logger.log(`Creating exam for user ${userId}: ${questionCount} questions, ${correctionMode} mode`);
+    this.logger.log(`Creating exam for user ${userId}: ${questionCount} questions, ${level} level, ${correctionMode} mode`);
 
     const exam = await this.prisma.exam.create({
       data: {
         userId,
         questionCount,
+        level,
         correctionMode,
         status: 'generating',
       },
     });
 
     try {
-      await this.generateExamContent(exam.id, userId, selectedLessons, questionCount, correctionMode);
+      await this.generateExamContent(exam.id, userId, selectedLessons, questionCount, correctionMode, level);
       this.logger.log(`Exam ${exam.id} created with ${questionCount} questions`);
     } catch (error) {
       this.logger.error(`Exam generation failed for ${exam.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -97,6 +96,7 @@ export class ExamsService {
       data: {
         userId,
         questionCount: original.questionCount,
+        level: original.level,
         correctionMode: original.correctionMode,
         status: 'generating',
       },
@@ -130,11 +130,13 @@ export class ExamsService {
     selectedLessons: any[],
     questionCount: number,
     correctionMode: string,
+    level: string,
   ) {
     const formattedLessons = this.formatLessonsForPrompt(selectedLessons);
     const aiResponse = await this.aiService.generateQuestions({
       lessons: formattedLessons,
       count: questionCount,
+      level,
     });
     const aiQuestions = aiResponse.questions;
 
@@ -191,6 +193,7 @@ export class ExamsService {
         select: {
           id: true,
           questionCount: true,
+          level: true,
           correctionMode: true,
           status: true,
           score: true,

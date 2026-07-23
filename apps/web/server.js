@@ -1,5 +1,4 @@
-import { createServer } from 'http'
-import http from 'http'
+import http, { createServer } from 'http'
 import next from 'next'
 
 const dev = process.env.NODE_ENV !== 'production'
@@ -7,7 +6,7 @@ const hostname = 'localhost'
 const port = parseInt(process.env.PORT || '3000', 10)
 const apiTarget = process.env.API_TARGET || 'http://localhost:3001'
 
-const app = next({ dev, hostname, port })
+const app = next({ dev })
 const handle = app.getRequestHandler()
 
 function proxyRequest(req, res) {
@@ -55,7 +54,7 @@ app.prepare().then(() => {
       return proxyRequest(req, res)
     }
 
-    handle(req, res, url)
+    handle(req, res)
   }).listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`)
   })
