@@ -23,6 +23,8 @@ export class AuthModule implements NestModule {
         { path: 'signup', method: RequestMethod.POST },
         { path: 'signin', method: RequestMethod.POST },
         { path: 'signout', method: RequestMethod.POST },
+        { path: 'forgot-password', method: RequestMethod.POST },
+        { path: 'reset-password', method: RequestMethod.POST },
       )
       .forRoutes('{*path}');
   }

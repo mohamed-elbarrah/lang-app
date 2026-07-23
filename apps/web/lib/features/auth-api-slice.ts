@@ -65,12 +65,50 @@ export const authApi = createApi({
       query: () => '/session',
       providesTags: ['Session'],
     }),
+    changePassword: builder.mutation<{ success: boolean; message: string }, ChangePasswordInput>({
+      query: (body) => ({
+        url: '/change-password',
+        method: 'POST',
+        body,
+      }),
+    }),
+    forgotPassword: builder.mutation<{ success: boolean; message: string }, ForgotPasswordInput>({
+      query: (body) => ({
+        url: '/forgot-password',
+        method: 'POST',
+        body,
+      }),
+    }),
+    resetPassword: builder.mutation<{ success: boolean; message: string }, ResetPasswordInput>({
+      query: (body) => ({
+        url: '/reset-password',
+        method: 'POST',
+        body,
+      }),
+    }),
   }),
 })
+
+export interface ChangePasswordInput {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface ForgotPasswordInput {
+  email: string
+}
+
+export interface ResetPasswordInput {
+  token: string
+  newPassword: string
+}
 
 export const {
   useRegisterMutation,
   useLoginMutation,
   useLogoutMutation,
   useGetSessionQuery,
+  useChangePasswordMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
 } = authApi

@@ -47,6 +47,28 @@ export class AuthService {
     return result;
   }
 
+  async changePassword(token: string, currentPassword: string, newPassword: string) {
+    const auth = getAuth();
+    return auth.api.changePassword({
+      body: { currentPassword, newPassword },
+      headers: cookieHeader(token),
+    });
+  }
+
+  async requestPasswordReset(email: string) {
+    const auth = getAuth();
+    return auth.api.requestPasswordReset({
+      body: { email },
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const auth = getAuth();
+    return auth.api.resetPassword({
+      body: { newPassword, token },
+    });
+  }
+
   async signUp(dto: SignUpDto) {
     const auth = getAuth();
     const result = await auth.api.signUpEmail({

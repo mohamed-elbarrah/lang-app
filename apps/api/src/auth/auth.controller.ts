@@ -1,12 +1,16 @@
 import {
   Controller, Post, Get, Body, Req, Res, HttpCode, HttpStatus,
-  ConflictException, UnauthorizedException,
+  ConflictException, UnauthorizedException, BadRequestException, UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { AuthGuard } from '../common/guards/auth.guard';
 import { SignUpDto } from '../common/dto/signup.dto';
 import { SignInDto } from '../common/dto/signin.dto';
+import { ChangePasswordDto } from '../common/dto/change-password.dto';
+import { ForgotPasswordDto } from '../common/dto/forgot-password.dto';
+import { ResetPasswordDto } from '../common/dto/reset-password.dto';
 import { AUTH_CONFIG, getCookieOptions } from './auth.config';
 
 function forwardSetCookies(res: Response, headers?: Headers) {
@@ -20,6 +24,56 @@ function forwardSetCookies(res: Response, headers?: Headers) {
 @Controller()
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  @UseGuards(AuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() req: Request,
+    @Body() body: ChangePasswordDto,
+  ) {
+    const token = req.cookies?.[AUTH_CONFIG.COOKIE_NAME] ??
+      req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      throw new UnauthorizedException('Not authenticated');
+    }
+
+    try {
+      await this.auth.changePassword(token, body.currentPassword, body.newPassword);
+      return { success: true, message: 'Password changed successfully' };
+    } catch (error: any) {
+      if (error?.status === 400 || error?.message?.toLowerCase().includes('password')) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+      throw new BadRequestException('Failed to change password');
+    }
+  }
+
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
+    try {
+      await this.auth.requestPasswordReset(body.email);
+    } catch {
+      // Always return success to prevent email enumeration
+    }
+    return { success: true, message: 'If an account exists, a reset link has been sent' };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    try {
+      await this.auth.resetPassword(body.token, body.newPassword);
+      return { success: true, message: 'Password reset successfully' };
+    } catch {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+  }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signup')
