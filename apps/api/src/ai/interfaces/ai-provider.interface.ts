@@ -2,6 +2,11 @@ export interface GenerateQuestionsParams {
   lessons: string;
   count: number;
   level: string;
+  context?: {
+    mode: 'fresh' | 'retake';
+    sourceLessonTitles?: string[];
+    previousQuestionSummaries?: string[];
+  };
 }
 
 export interface EvaluateAnswerParams {

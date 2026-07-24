@@ -130,6 +130,7 @@ model Exam {
   level          DifficultyLevel @default(beginner)
   contentHash    String?
   correctionMode CorrectionMode @default(final)
+  sourceLessonIds Json?
   status         ExamStatus     @default(in_progress)
   score          Int?
   createdAt      DateTime       @default(now())

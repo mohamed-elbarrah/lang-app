@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { Prisma, QuestionType } from '@prisma/client';
 import { createHash } from 'crypto';
+import type { AiQuestionsResponse, GeneratedQuestion } from '../ai/ai-output.schema';
+import type { GenerateQuestionsParams } from '../ai/interfaces/ai-provider.interface';
 
 interface CreateExamDto {
   level: 'beginner' | 'intermediate' | 'advanced';
@@ -14,6 +16,21 @@ interface CreateExamDto {
 interface SubmitAnswerDto {
   questionId: string;
   answer: unknown;
+}
+
+type LessonWithPart = Prisma.LessonGetPayload<{ include: { part: true } }>;
+type ExamWithQuestions = Prisma.ExamGetPayload<{
+  include: {
+    questions: {
+      orderBy: { order: 'asc' };
+    };
+  };
+}>;
+
+interface QuestionCorpusEntry {
+  text: string;
+  tokenSet: Set<string>;
+  summary: string;
 }
 
 @Injectable()
@@ -58,12 +75,13 @@ export class ExamsService {
         questionCount,
         level,
         correctionMode,
+        sourceLessonIds: dto.lessonIds as Prisma.InputJsonValue,
         status: 'generating',
       },
     });
 
     try {
-      await this.generateExamContent(exam.id, userId, selectedLessons, questionCount, correctionMode, level);
+      await this.generateExamContent(exam.id, selectedLessons, questionCount, level);
       this.logger.log(`Exam ${exam.id} created with ${questionCount} questions`);
     } catch (error) {
       this.logger.error(`Exam generation failed for ${exam.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -98,70 +116,48 @@ export class ExamsService {
         questionCount: original.questionCount,
         level: original.level,
         correctionMode: original.correctionMode,
+        sourceLessonIds: original.sourceLessonIds as Prisma.InputJsonValue,
         status: 'generating',
       },
     });
 
-    const questions = original.questions.map((q, i) => ({
-      examId: newExam.id,
-      type: q.type,
-      content: q.content as Prisma.InputJsonValue,
-      correctAnswer: q.correctAnswer,
-      answerKey: q.answerKey as Prisma.InputJsonValue,
-      explanation: q.explanation,
-      order: i + 1,
-      lessonTopic: q.lessonTopic,
-    }));
+    const selectedLessons = await this.resolveLessonsForRetake(original);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.question.createMany({ data: questions });
-      await tx.exam.update({
-        where: { id: newExam.id },
-        data: { status: 'in_progress' },
+    try {
+      await this.generateExamContent(
+        newExam.id,
+        selectedLessons,
+        original.questionCount,
+        original.level,
+        original.questions,
+      );
+    } catch (error) {
+      await this.prisma.exam.delete({ where: { id: newExam.id } }).catch((deleteError) => {
+        this.logger.error(`Failed to delete broken retake ${newExam.id}: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`);
       });
-    });
+      throw error;
+    }
 
     return this.findById(newExam.id, userId);
   }
 
   private async generateExamContent(
     examId: string,
-    userId: string,
-    selectedLessons: any[],
+    selectedLessons: LessonWithPart[],
     questionCount: number,
-    correctionMode: string,
     level: string,
+    previousQuestions: ExamWithQuestions['questions'] = [],
   ) {
     const formattedLessons = this.formatLessonsForPrompt(selectedLessons);
-
-    const MAX_RETRIES = 1;
-    let aiResponse: Awaited<ReturnType<AiService['generateQuestions']>> | null = null;
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        aiResponse = await this.aiService.generateQuestions({
-          lessons: formattedLessons,
-          count: questionCount,
-          level,
-        });
-        break;
-      } catch (error) {
-        lastError = error;
-        if (attempt < MAX_RETRIES) {
-          this.logger.warn(
-            `AI generation attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for exam ${examId}: ${error instanceof Error ? error.message : 'Unknown error'}. Retrying...`,
-          );
-          continue;
-        }
-      }
-    }
-
-    if (!aiResponse) {
-      throw lastError;
-    }
-
-    const aiQuestions = aiResponse.questions;
+    const blockedCorpus = this.createBlockedCorpus(previousQuestions);
+    const aiQuestions = await this.generateUniqueQuestions(
+      examId,
+      formattedLessons,
+      questionCount,
+      level,
+      selectedLessons,
+      blockedCorpus,
+    );
 
     const questions = aiQuestions.map((q, i) => {
       const lesson = selectedLessons[i % selectedLessons.length];
@@ -695,5 +691,127 @@ export class ExamsService {
     }
 
     return parts.join('\n');
+  }
+
+  private async resolveLessonsForRetake(original: ExamWithQuestions): Promise<LessonWithPart[]> {
+    const raw = original.sourceLessonIds;
+    const lessonIds = Array.isArray(raw) ? (raw as string[]) : [];
+
+    if (lessonIds.length === 0) {
+      throw new BadRequestException('Original exam has no source lesson data');
+    }
+
+    const lessons = await this.prisma.lesson.findMany({
+      where: { id: { in: lessonIds } },
+      include: { part: true },
+      orderBy: { order: 'asc' },
+    });
+
+    if (lessons.length === 0) {
+      throw new BadRequestException('No valid lessons found for retake');
+    }
+
+    return this.selectLessons(lessons, original.questionCount);
+  }
+
+  private createBlockedCorpus(questions: ExamWithQuestions['questions']): Map<string, QuestionCorpusEntry> {
+    const corpus = new Map<string, QuestionCorpusEntry>();
+
+    for (const q of questions) {
+      const content = q.content as Record<string, unknown>;
+      const text = String(content.question || content.sentence || content.scenario || '');
+      if (!text) continue;
+
+      const tokens = text.toLowerCase().split(/\s+/).filter(Boolean);
+      const summary = `[${q.type}] ${q.lessonTopic ? `(${q.lessonTopic}) ` : ''}${text.slice(0, 120)}`;
+      const key = createHash('sha256').update(text).digest('hex');
+
+      corpus.set(key, { text, tokenSet: new Set(tokens), summary });
+    }
+
+    return corpus;
+  }
+
+  private async generateUniqueQuestions(
+    examId: string,
+    formattedLessons: string,
+    questionCount: number,
+    level: string,
+    selectedLessons: LessonWithPart[],
+    blockedCorpus: Map<string, QuestionCorpusEntry>,
+  ): Promise<GeneratedQuestion[]> {
+    const MAX_RETRIES = 2;
+    let allQuestions: GeneratedQuestion[] = [];
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const remaining = questionCount - allQuestions.length;
+      if (remaining <= 0) break;
+
+      const context: GenerateQuestionsParams['context'] = blockedCorpus.size > 0 || allQuestions.length > 0
+        ? {
+            mode: 'retake',
+            sourceLessonTitles: selectedLessons.map((l) => l.title),
+            previousQuestionSummaries: Array.from(blockedCorpus.values()).map((e) => e.summary),
+          }
+        : undefined;
+
+      try {
+        const response = await this.aiService.generateQuestions({
+          lessons: formattedLessons,
+          count: Math.max(remaining, Math.ceil(questionCount * 1.2)),
+          level,
+          context,
+        });
+
+        const deduped = response.questions.filter((q) => !this.isCollision(q, blockedCorpus));
+
+        for (const q of deduped) {
+          const content = q.content as Record<string, unknown>;
+          const text = String(content.question || content.sentence || content.scenario || '');
+          if (!text) continue;
+          const tokens = text.toLowerCase().split(/\s+/).filter(Boolean);
+          const summary = `[${q.type}] ${q.lessonTopic ? `(${q.lessonTopic}) ` : ''}${text.slice(0, 120)}`;
+          const key = createHash('sha256').update(text).digest('hex');
+          blockedCorpus.set(key, { text, tokenSet: new Set(tokens), summary });
+        }
+
+        allQuestions.push(...deduped);
+      } catch (error) {
+        lastError = error;
+        if (attempt < MAX_RETRIES) {
+          this.logger.warn(`Generation attempt ${attempt + 1} failed for exam ${examId}, retrying...`);
+          continue;
+        }
+      }
+    }
+
+    if (allQuestions.length === 0) {
+      throw lastError || new Error('Failed to generate any questions');
+    }
+
+    if (allQuestions.length < questionCount) {
+      this.logger.warn(`Only generated ${allQuestions.length}/${questionCount} unique questions for exam ${examId}`);
+    }
+
+    return allQuestions.slice(0, questionCount).map((q, i) => ({ ...q, order: i + 1 }));
+  }
+
+  private isCollision(q: GeneratedQuestion, corpus: Map<string, QuestionCorpusEntry>): boolean {
+    const content = q.content as Record<string, unknown>;
+    const text = String(content.question || content.sentence || content.scenario || '').toLowerCase();
+    if (!text) return false;
+
+    const tokens = text.split(/\s+/).filter(Boolean);
+
+    for (const entry of corpus.values()) {
+      if (entry.text.toLowerCase() === text) return true;
+
+      const matchCount = tokens.filter((t) => entry.tokenSet.has(t)).length;
+      const maxLen = Math.max(tokens.length, entry.tokenSet.size);
+      if (maxLen > 0 && matchCount / maxLen > 0.7) return true;
+    }
+
+    return false;
   }
 }
