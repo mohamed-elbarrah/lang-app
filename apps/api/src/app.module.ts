@@ -11,6 +11,7 @@ import { AiModule } from './ai/ai.module';
 import { AiProvidersModule } from './ai-providers/ai-providers.module';
 import { ExamsModule } from './exams/exams.module';
 import { ResultsModule } from './results/results.module';
+import { StudyModule } from './study/study.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CommonModule } from './common/common.module';
 import { CsrfGuard } from './common/guards/csrf.guard';
@@ -34,6 +35,7 @@ import { CsrfGuard } from './common/guards/csrf.guard';
     AiProvidersModule,
     ExamsModule,
     ResultsModule,
+    StudyModule,
     DashboardModule,
   ],
   controllers: [AppController],

@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpenRouterProvider } from './providers/openrouter.provider';
-import type { GenerateQuestionsParams, EvaluateAnswerParams } from './interfaces/ai-provider.interface';
+import type { GenerateQuestionsParams, GenerateStudyQuestionsParams, EvaluateAnswerParams } from './interfaces/ai-provider.interface';
 import { aiQuestionsResponseSchema } from './ai-output.schema';
 
 @Injectable()
@@ -28,6 +28,25 @@ export class AiService {
 
     const duration = Date.now() - start;
     this.logger.log(`Generated ${parsed.questions.length} questions in ${duration}ms`);
+    return parsed;
+  }
+
+  async generateStudyQuestions(params: GenerateStudyQuestionsParams) {
+    this.logger.log(`Generating ${params.count} study questions via AI`);
+    const start = Date.now();
+
+    const provider = await this.getActiveProvider();
+    const impl = new OpenRouterProvider(
+      provider.apiKey,
+      provider.defaultModel || 'openai/gpt-4o-mini',
+      provider.baseUrl || undefined,
+    );
+
+    const raw = await impl.generateStudyQuestions(params);
+    const parsed = this.parseAndValidateQuestions(raw);
+
+    const duration = Date.now() - start;
+    this.logger.log(`Generated ${parsed.questions.length} study questions in ${duration}ms`);
     return parsed;
   }
 

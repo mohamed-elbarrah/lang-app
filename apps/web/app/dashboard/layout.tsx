@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, LayoutDashboard, FileText, History, User as UserIcon, LogOut, AlertTriangle, X } from "lucide-react";
+import { CheckCircle2, LayoutDashboard, BookOpen, FileText, History, User as UserIcon, LogOut, AlertTriangle, X } from "lucide-react";
 import Link from "next/link";
 import { useAppSelector } from "@/lib/hooks";
 import { useAppDispatch } from "@/lib/hooks";
@@ -48,6 +48,10 @@ function DashboardSidebar({ children }: { children: React.ReactNode }) {
           <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md bg-muted text-foreground">
             <LayoutDashboard className="h-4 w-4" />
             Dashboard
+          </Link>
+          <Link href="/dashboard/study" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted text-muted-foreground hover:text-foreground">
+            <BookOpen className="h-4 w-4" />
+            Study
           </Link>
           <Link href="/dashboard/new-test" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted text-muted-foreground hover:text-foreground">
             <FileText className="h-4 w-4" />

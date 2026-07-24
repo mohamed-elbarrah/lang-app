@@ -53,9 +53,10 @@ model user {
   updatedAt    DateTime  @updatedAt
   role         UserRole  @default(user)
 
-  sessions session[]
-  accounts account[]
-  exams    Exam[]
+  sessions      session[]
+  accounts      account[]
+  exams         Exam[]
+  studySessions StudySession[]
 }
 
 model session {
@@ -118,6 +119,7 @@ model Lesson {
   examples   Json
   createdAt  DateTime    @default(now())
   bankItems  QuestionBankItem[]
+  studySessions StudySession[]
 
   @@index([partId])
 }
@@ -182,6 +184,47 @@ model QuestionBankItem {
   @@index([lessonId, type])
   @@index([contentHash])
   @@index([status])
+}
+
+enum StudySessionStatus {
+  in_progress
+  completed
+}
+
+model StudySession {
+  id          String             @id @default(uuid())
+  userId      String
+  lessonId    String
+  status      StudySessionStatus @default(in_progress)
+  score       Int?
+  createdAt   DateTime           @default(now())
+  completedAt DateTime?
+
+  user    user          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson  Lesson        @relation(fields: [lessonId], references: [id])
+  answers StudyAnswer[]
+
+  @@index([userId])
+  @@index([userId, lessonId])
+  @@index([userId, status])
+}
+
+model StudyAnswer {
+  id            String       @id @default(uuid())
+  sessionId     String
+  type          QuestionType
+  content       Json
+  userAnswer    String?
+  correctAnswer String?
+  isCorrect     Boolean?
+  score         Int?
+  explanation   String?
+  order         Int
+  createdAt     DateTime     @default(now())
+
+  session StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }
 
 model ExamGenerationRequest {

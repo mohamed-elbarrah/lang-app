@@ -15,8 +15,15 @@ export interface EvaluateAnswerParams {
   correctAnswer: string;
 }
 
+export interface GenerateStudyQuestionsParams {
+  lesson: string;
+  count: number;
+  level: string;
+}
+
 export interface AiProvider {
   generateQuestions(params: GenerateQuestionsParams): Promise<string>;
+  generateStudyQuestions(params: GenerateStudyQuestionsParams): Promise<string>;
   evaluateAnswer(params: EvaluateAnswerParams): Promise<string>;
   generateExplanation(params: EvaluateAnswerParams): Promise<string>;
   testConnection(): Promise<boolean>;

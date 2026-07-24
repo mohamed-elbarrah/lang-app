@@ -1,6 +1,7 @@
 import {
   AiProvider,
   GenerateQuestionsParams,
+  GenerateStudyQuestionsParams,
   EvaluateAnswerParams,
 } from '../interfaces/ai-provider.interface';
 
@@ -54,6 +55,17 @@ export class OpenRouterProvider implements AiProvider {
       { role: 'system', content: 'You are an English grammar test generator. Always respond with valid JSON. Create varied, non-repetitive questions.' },
       { role: 'user', content: prompt },
     ], 0.8, 4000);
+
+    return response;
+  }
+
+  async generateStudyQuestions(params: GenerateStudyQuestionsParams): Promise<string> {
+    const prompt = this.buildStudyPrompt(params);
+
+    const response = await this.chatCompletion([
+      { role: 'system', content: 'You are an English grammar tutor creating practice exercises. Always respond with valid JSON.' },
+      { role: 'user', content: prompt },
+    ], 0.7, 4000);
 
     return response;
   }
@@ -305,5 +317,119 @@ Return a JSON object with:
     ]
       .filter((segment): segment is string => Boolean(segment))
       .join('\n');
+  }
+
+  private buildStudyPrompt(params: GenerateStudyQuestionsParams): string {
+    const levelHint: Record<string, string> = {
+      beginner: 'simple vocabulary, clear contexts, basic grammar rules',
+      intermediate: 'moderate vocabulary, real-world contexts, practical grammar',
+      advanced: 'complex vocabulary, nuanced contexts, advanced grammar',
+    };
+
+    const jsonTemplate = JSON.stringify(
+      {
+        questions: [
+          {
+            type: 'multiple_choice',
+            content: {
+              instruction: 'Choose the correct option.',
+              question: 'She ___ to school every day.',
+              options: [
+                { label: 'A', text: 'go' },
+                { label: 'B', text: 'goes' },
+                { label: 'C', text: 'going' },
+              ],
+            },
+            answerKey: { correctAnswer: 'B' },
+            explanation: 'Third-person singular requires "goes" in simple present.',
+            order: 1,
+          },
+          {
+            type: 'fill_blank',
+            content: {
+              instruction: 'Fill in the blank.',
+              sentence: 'She ____ to school every day.',
+            },
+            answerKey: { correctAnswer: 'goes' },
+            explanation: 'Third-person singular requires "goes".',
+            order: 2,
+          },
+          {
+            type: 'error_correction',
+            content: {
+              instruction: 'Find and correct the error.',
+              sentence: 'She go to school every day.',
+            },
+            answerKey: { correctAnswer: 'goes' },
+            explanation: 'Subject "She" is third-person singular, so the verb should be "goes".',
+            order: 3,
+          },
+          {
+            type: 'sentence_creation',
+            content: {
+              instruction: 'Create a sentence using the given word.',
+              criteria: 'Write one sentence using "although" to show contrast.',
+            },
+            answerKey: { correctAnswer: 'Although it was raining, she went to the park.' },
+            explanation: '"Although" introduces a contrasting clause.',
+            order: 4,
+          },
+          {
+            type: 'scenario',
+            content: {
+              instruction: 'Choose the best response.',
+              scenario: 'You are at a restaurant. The waiter asks what you would like to drink.',
+              question: 'What do you say?',
+              options: [
+                { label: 'A', text: 'I want a water.' },
+                { label: 'B', text: 'I would like some water, please.' },
+                { label: 'C', text: 'Give me water.' },
+              ],
+            },
+            answerKey: { correctAnswer: 'B' },
+            explanation: '"I would like..." is the most polite and natural response.',
+            order: 5,
+          },
+        ],
+      },
+      null,
+      2,
+    );
+
+    return [
+      'You are an English grammar tutor creating practice exercises for a student.',
+      `Generate exactly ${params.count} practice exercises based on the lesson below.`,
+      `Level: ${params.level} (${levelHint[params.level] || levelHint.beginner}).`,
+      '',
+      'The student is learning this material. Every exercise should directly reinforce the grammar rule being taught.',
+      '',
+      'Lesson content:',
+      params.lesson,
+      '',
+      'Rules:',
+      '- Spread exercises across all 5 types: multiple_choice, fill_blank, error_correction, sentence_creation, scenario.',
+      '- Every exercise must directly test the grammar rule from the lesson.',
+      '- Keep options plausible but ensure one clearly correct answer.',
+      '- For sentence_creation, provide a clear criteria linked to the lesson rule.',
+      '- Include a helpful explanation with each question so the student can learn from mistakes.',
+      '',
+      'Return a JSON object with a "questions" array. Each question must have:',
+      '- "type", "content", "answerKey" (object with "correctAnswer"), "explanation", "order"',
+      '',
+      'Per-type content (follow exactly):',
+      '- multiple_choice: { "instruction", "question", "options": [{ "label": "A", "text": "..." }, ...] }',
+      '- fill_blank:     { "instruction", "sentence" (use "____" as blank) }',
+      '- error_correction: { "instruction", "sentence" }',
+      '- sentence_creation: { "instruction", "criteria" }',
+      '- scenario:       { "instruction", "scenario", "question", "options": [{ "label": "A", "text": "..." }, ...] }',
+      '',
+      'Options labels are single uppercase letters (A, B, C...).',
+      'For fill_blank answerKey: use pipe "|" for multiple answers: { "correctAnswer": "word1|word2" }',
+      '',
+      'Follow this JSON structure (use your own content):',
+      jsonTemplate,
+      '',
+      'Return valid JSON only.',
+    ].join('\n');
   }
 }

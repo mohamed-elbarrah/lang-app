@@ -57,7 +57,7 @@ export const generatedQuestionSchema = z.object({
   answerKey: answerKeySchema,
   explanation: z.string().min(1).max(2000).optional().default(''),
   order: z.number().int().min(1),
-  lessonTopic: z.string().min(1).max(200),
+  lessonTopic: z.string().min(1).max(200).optional(),
 });
 
 export const aiQuestionsResponseSchema = z.object({
